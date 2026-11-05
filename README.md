@@ -75,6 +75,108 @@ Laravelを用いて、書籍レビューアプリケーションを開発しま�
 特に、入力条件・バリデーションメッセージ・フラッシュメッセージを、
 各機能の動作と併せて確認します。
 
+## 新規取得時の環境構築手順
+
+以下はmainへの環境構築ブランチ反映後に使用する手順です。
+新規取得環境での一連の実行検証は未実施です。
+
+### 1. 前提条件
+
+- Docker Desktopが起動していること
+- 作業用UbuntuでWSL integrationが有効であること
+- WSL2のBashターミナルで実行すること
+- ホスト側の80・3306・5173・8080番ポートが使用可能であること
+
+### 2. リポジトリを取得する
+
+```bash
+mkdir -p ~/projects
+cd ~/projects
+git clone https://github.com/715OXY/bookshelf-app.git
+cd bookshelf-app
+```
+
+既存の作業フォルダーがある場合は、別の場所へ取得する。
+
+### 3. 環境変数を設定する
+
+```bash
+cp .env.example .env
+id -u
+id -g
+```
+
+.envのWWWUSERにはid -u、WWWGROUPにはid -gの結果を設定する。
+DB接続情報は後述の「DB設定」を参照する。
+
+### 4. PHP依存パッケージを導入する
+
+シート4指定の作成用イメージを使用する。
+当局回答に基づく作成用環境と、アプリ実行用環境は区別する。
+
+```bash
+docker pull laravelsail/php82-composer:latest
+
+docker run --rm -u "$(id -u):$(id -g)" \
+  -v "$(pwd):/var/www/html" \
+  -w /var/www/html \
+  -e COMPOSER_CACHE_DIR=/tmp/composer_cache \
+  laravelsail/php82-composer:latest \
+  composer install
+```
+
+composer.lockに記録された依存関係を使用するため、
+新規取得時にcreate-projectやcomposer updateは実行しない。
+
+### 5. コンテナをビルド・起動する
+
+```bash
+docker compose config --quiet
+docker compose build --pull --no-cache laravel.test
+./vendor/bin/sail up -d
+./vendor/bin/sail ps
+./vendor/bin/sail php -v
+./vendor/bin/sail composer check-platform-reqs
+```
+
+アプリ実行用PHPが、当局通知の修正版8.5.12以上であることを確認する。
+ビルド元の配布状況によって実際のパッチ番号は変わる。
+
+### 6. アプリケーションキー・DBを初期設定する
+
+```bash
+./vendor/bin/sail artisan key:generate
+./vendor/bin/sail artisan config:clear
+./vendor/bin/sail artisan migrate --seed
+./vendor/bin/sail artisan migrate:status
+```
+
+key:generateは新規環境の初期設定時に実行する。
+現在のDatabaseSeederは空で、業務用初期データは後続で追加する。
+
+### 7. フロントエンドをセットアップする
+
+```bash
+./vendor/bin/sail npm ci
+./vendor/bin/sail npm run build
+```
+
+package-lock.jsonの依存関係を使用する。
+esbuildのスクリプト許可はpackage.jsonに記録済み。
+
+提供済みの基本版resourcesはリポジトリに含まれるため、
+新規取得時の再移入は不要。
+
+### 8. 開発を開始する
+
+別のターミナルで以下を実行し、開発中は起動を維持する。
+
+```bash
+./vendor/bin/sail npm run dev
+```
+
+起動・停止方法と接続先は、後述の作業記録を参照する。
+
 ## 環境構築の作業記録
 
 確認日：2026-11-05
