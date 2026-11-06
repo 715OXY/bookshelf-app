@@ -15,9 +15,12 @@ class DatabaseConnectionTest extends TestCase
         $connection = DB::connection();
 
         $this->assertSame('mysql', $connection->getDriverName());
+        $this->assertSame('mysql', $connection->getConfig('host'));
         $this->assertSame('testing', $connection->getDatabaseName());
 
-        $result = $connection->selectOne('SELECT DATABASE() AS db');
+        $result = $connection->selectOne(
+            'SELECT DATABASE() AS db'
+        );
 
         $this->assertSame('testing', $result->db);
     }
