@@ -9,6 +9,7 @@ use App\Models\Genre;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BookController extends Controller
 {
@@ -64,11 +65,24 @@ class BookController extends Controller
     }
 
     /**
-     * 登録の認可・入力検証を行う。保存はIssue 2で実装する。
+     * 書籍と選択ジャンルを登録する。
      */
-    public function store(StoreBookRequest $request): never
+    public function store(StoreBookRequest $request): RedirectResponse
     {
-        abort(501, '書籍の登録処理は実装途中です。');
+        $attributes = $request->safe()->except('genres');
+        $attributes['user_id'] = $request->user()->id;
+        $genreIds = $request->validated('genres');
+
+        $book = DB::transaction(function () use ($attributes, $genreIds): Book {
+            $book = Book::create($attributes);
+            $book->genres()->sync($genreIds);
+
+            return $book;
+        });
+
+        return redirect()
+            ->route('books.show', $book)
+            ->with('success', '書籍を登録しました。');
     }
 
     /**
@@ -101,20 +115,36 @@ class BookController extends Controller
     }
 
     /**
-     * 更新の認可・入力検証を行う。保存はIssue 2で実装する。
+     * 書籍情報と選択ジャンルを更新する。
      */
-    public function update(UpdateBookRequest $request, Book $book): never
+    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
-        abort(501, '書籍の更新処理は実装途中です。');
+        $attributes = $request->safe()->except(['genres', 'user_id']);
+        $genreIds = $request->validated('genres');
+
+        DB::transaction(function () use ($book, $attributes, $genreIds): void {
+            $book->update($attributes);
+            $book->genres()->sync($genreIds);
+        });
+
+        return redirect()
+            ->route('books.show', $book)
+            ->with('success', '書籍情報を更新しました。');
     }
 
     /**
-     * 削除を認可する。削除処理はIssue 2で実装する。
+     * 作成者が書籍を削除する。
      */
-    public function destroy(Book $book): never
+    public function destroy(Book $book): RedirectResponse
     {
         $this->authorize('delete', $book);
 
-        abort(501, '書籍の削除処理は実装途中です。');
+        DB::transaction(function () use ($book): void {
+            $book->delete();
+        });
+
+        return redirect()
+            ->route('books.index')
+            ->with('success', '書籍を削除しました。');
     }
 }
