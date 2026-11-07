@@ -2,13 +2,33 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\BookController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\RegisteredUserController;
 
-Route::get('/', function () {
-    return view('welcome');
+Route::get('/', [BookController::class, 'index'])
+    ->name('books.index');
+
+Route::middleware('auth:web')->group(function () {
+    Route::get('/books/create', [BookController::class, 'create'])
+        ->name('books.create');
+
+    Route::post('/books', [BookController::class, 'store'])
+        ->name('books.store');
+
+    Route::get('/books/{book}/edit', [BookController::class, 'edit'])
+        ->name('books.edit');
+
+    Route::put('/books/{book}', [BookController::class, 'update'])
+        ->name('books.update');
+
+    Route::delete('/books/{book}', [BookController::class, 'destroy'])
+        ->name('books.destroy');
 });
+
+Route::get('/books/{book}', [BookController::class, 'show'])
+    ->name('books.show');
 
 Route::middleware('guest:web')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])
