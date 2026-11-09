@@ -106,6 +106,13 @@ class BookTransactionTest extends TestCase
             ->assertHeaderMissing('Location')
             ->assertSessionMissing('success');
 
+        if ($method === 'POST') {
+            $this->assertSame(
+                '登録に失敗しました。',
+                $response->getContent()
+            );
+        }
+
         $this->assertSame($before, $this->DB状態());
     }
 

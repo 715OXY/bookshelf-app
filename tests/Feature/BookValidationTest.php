@@ -247,6 +247,86 @@ class BookValidationTest extends TestCase
         return $snapshot;
     }
 
+    #[DataProvider('不正な入力')]
+    public function test_不正な更新入力を拒否し既存データを保持する(
+        string $field,
+        mixed $value,
+        string $errorKey,
+        string $message
+    ): void {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $book = Book::factory()->create([
+            'user_id' => $user->id,
+            'isbn' => '9781234567890',
+        ]);
+        $book->genres()->sync([$genre->id]);
+
+        $payload = $this->正常入力($genre);
+        $payload[$field] = $value;
+
+        $before = $this->書籍関連のDB状態();
+
+        $this->actingAs($user, 'web')
+            ->put(route('books.update', $book), $payload)
+            ->assertRedirect(route('books.edit', $book))
+            ->assertSessionHasErrors([$errorKey => $message])
+            ->assertSessionMissing('success');
+
+        $this->assertSame($before, $this->書籍関連のDB状態());
+    }
+
+    public function test_登録時にジャンルの重複を拒否する(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $payload = $this->正常入力($genre);
+        $payload['genres'] = [$genre->id, $genre->id];
+
+        $before = $this->書籍関連のDB状態();
+
+        $this->actingAs($user, 'web')
+            ->post(route('books.store'), $payload)
+            ->assertRedirect(route('books.create'))
+            ->assertSessionHasErrors([
+                'genres.0' => '同じジャンルを重複して選択しないでください。',
+                'genres.1' => '同じジャンルを重複して選択しないでください。',
+            ])
+            ->assertSessionMissing('success');
+
+        $this->assertSame($before, $this->書籍関連のDB状態());
+    }
+
+    public function test_更新時にジャンルの重複を拒否する(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $book = Book::factory()->create([
+            'user_id' => $user->id,
+            'isbn' => '9781234567890',
+        ]);
+        $book->genres()->sync([$genre->id]);
+
+        $payload = $this->正常入力($genre);
+        $payload['genres'] = [$genre->id, $genre->id];
+
+        $before = $this->書籍関連のDB状態();
+
+        $this->actingAs($user, 'web')
+            ->put(route('books.update', $book), $payload)
+            ->assertRedirect(route('books.edit', $book))
+            ->assertSessionHasErrors([
+                'genres.0' => '同じジャンルを重複して選択しないでください。',
+                'genres.1' => '同じジャンルを重複して選択しないでください。',
+            ])
+            ->assertSessionMissing('success');
+
+        $this->assertSame($before, $this->書籍関連のDB状態());
+    }
+
     /**
      * @return array<string, mixed>
      */

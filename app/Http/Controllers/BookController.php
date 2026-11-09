@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\BookRegistrationFailedException;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
@@ -10,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class BookController extends Controller
 {
@@ -73,12 +75,16 @@ class BookController extends Controller
         $attributes['user_id'] = $request->user()->id;
         $genreIds = $request->validated('genres');
 
-        $book = DB::transaction(function () use ($attributes, $genreIds): Book {
-            $book = Book::create($attributes);
-            $book->genres()->sync($genreIds);
+        try {
+            $book = DB::transaction(function () use ($attributes, $genreIds): Book {
+                $book = Book::create($attributes);
+                $book->genres()->sync($genreIds);
 
-            return $book;
-        });
+                return $book;
+            });
+        } catch (Throwable $e) {
+            throw new BookRegistrationFailedException($e);
+        }
 
         return redirect()
             ->route('books.show', $book)
