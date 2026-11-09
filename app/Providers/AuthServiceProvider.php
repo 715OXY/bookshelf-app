@@ -2,22 +2,23 @@
 
 namespace App\Providers;
 
-// use Illuminate\Support\Facades\Gate;
+use App\Models\Book;
+use App\Policies\BookPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
 {
     /**
-     * The model to policy mappings for the application.
+     * ModelとPolicyの対応。
      *
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        //
+        Book::class => BookPolicy::class,
     ];
 
     /**
-     * Register any authentication / authorization services.
+     * 認証・認可に関するサービスを初期化する。
      */
     public function boot(): void
     {
