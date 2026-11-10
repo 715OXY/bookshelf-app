@@ -169,6 +169,19 @@ class DatabaseConstraintsTest extends TestCase
             $remaining->id,
         ]);
 
+        // 対象レビューに複数のいいねを付ける。
+        $additionalLikers = User::factory()->count(2)->create();
+
+        foreach ($additionalLikers as $liker) {
+            $liker->likedReviews()->attach($target->id);
+        }
+
+        // レビュー削除後も残すべき書籍の関連データ。
+        $user->favoriteBooks()->attach($book->id);
+        $genre = $book->genres()->sole();
+
+        $this->assertSame(3, $target->likedByUsers()->count());
+
         $target->delete();
 
         $this->assertDatabaseMissing('reviews', ['id' => $target->id]);
@@ -183,6 +196,20 @@ class DatabaseConstraintsTest extends TestCase
         ]);
         $this->assertDatabaseHas('books', ['id' => $book->id]);
         $this->assertDatabaseHas('users', ['id' => $user->id]);
+
+        $this->assertDatabaseHas('favorites', [
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+        $this->assertDatabaseHas('book_genres', [
+            'book_id' => $book->id,
+            'genre_id' => $genre->id,
+        ]);
+        $this->assertDatabaseHas('genres', ['id' => $genre->id]);
+
+        foreach ($additionalLikers as $liker) {
+            $this->assertDatabaseHas('users', ['id' => $liker->id]);
+        }
     }
 
     public function test_書籍に紐付くジャンルは削除できない(): void
@@ -233,5 +260,68 @@ class DatabaseConstraintsTest extends TestCase
         }
 
         $this->fail('書籍から参照されているユーザーが削除されました。');
+    }
+
+    public function test_いいねがないレビューも削除できる(): void
+    {
+        $review = Review::factory()->create();
+
+        $reviewId = $review->id;
+        $bookId = $review->book_id;
+        $userId = $review->user_id;
+
+        $this->assertSame(0, $review->likedByUsers()->count());
+
+        $review->delete();
+
+        $this->assertDatabaseMissing('reviews', ['id' => $reviewId]);
+        $this->assertDatabaseMissing('review_likes', [
+            'review_id' => $reviewId,
+        ]);
+        $this->assertDatabaseHas('books', ['id' => $bookId]);
+        $this->assertDatabaseHas('users', ['id' => $userId]);
+    }
+
+    public function test_レビューの評価とコメントを更新してもいいねは保持される(): void
+    {
+        $review = Review::factory()->create([
+            'rating' => 2,
+            'comment' => '更新前のコメント',
+        ]);
+
+        $likers = User::factory()->count(3)->create();
+        $review->likedByUsers()->attach($likers->modelKeys());
+
+        $bookId = $review->book_id;
+        $userId = $review->user_id;
+
+        $likesBefore = DB::table('review_likes')
+            ->where('review_id', $review->id)
+            ->orderBy('id')
+            ->get()
+            ->toArray();
+
+        $this->assertCount(3, $likesBefore);
+
+        $review->update([
+            'rating' => 5,
+            'comment' => '更新後のコメント',
+        ]);
+
+        $this->assertDatabaseHas('reviews', [
+            'id' => $review->id,
+            'user_id' => $userId,
+            'book_id' => $bookId,
+            'rating' => 5,
+            'comment' => '更新後のコメント',
+        ]);
+
+        $likesAfter = DB::table('review_likes')
+            ->where('review_id', $review->id)
+            ->orderBy('id')
+            ->get()
+            ->toArray();
+
+        $this->assertEquals($likesBefore, $likesAfter);
     }
 }
