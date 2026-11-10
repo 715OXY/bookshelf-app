@@ -23,7 +23,9 @@ class ReviewController extends Controller
         $attributes['user_id'] = $request->user()->id;
         $attributes['book_id'] = $book->id;
 
-        Review::create($attributes);
+        DB::transaction(function () use ($attributes): void {
+            Review::create($attributes);
+        });
 
         return redirect()
             ->route('books.show', $book)
@@ -51,7 +53,9 @@ class ReviewController extends Controller
     ): RedirectResponse {
         $attributes = $request->safe()->only(['rating', 'comment']);
 
-        $review->update($attributes);
+        DB::transaction(function () use ($review, $attributes): void {
+            $review->update($attributes);
+        });
 
         return redirect()
             ->route('books.show', ['book' => $review->book_id])

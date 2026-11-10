@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Review;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreReviewRequest extends FormRequest
 {
@@ -46,21 +47,31 @@ class StoreReviewRequest extends FormRequest
     }
 
     /**
-     * 提供Bladeで表示できない入力型を、再表示用に空文字へ置き換える。
+     * 入力エラーと、提供Bladeで表示できる旧入力を返す。
      */
     protected function failedValidation(Validator $validator): void
     {
+        // JSONを要求された場合は標準の検証エラー処理を使用する。
+        if ($this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+
         $rating = $this->input('rating');
         $comment = $this->input('comment');
 
-        $this->merge([
+        $oldInput = [
             'rating' => is_string($rating) || is_int($rating)
                 ? $rating
                 : '',
             'comment' => is_string($comment) ? $comment : '',
-        ]);
+        ];
 
-        parent::failedValidation($validator);
+        $response = redirect()
+            ->to($this->getRedirectUrl())
+            ->withErrors($validator, $this->errorBag)
+            ->withInput($oldInput);
+
+        throw new HttpResponseException($response);
     }
 
     /**
