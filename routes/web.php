@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
@@ -38,6 +39,9 @@ Route::middleware('auth:web')->group(function () {
 
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])
         ->name('reviews.destroy');
+
+    Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])
+        ->name('favorites.toggle');
 });
 
 Route::get('/books/{book}', [BookController::class, 'show'])
