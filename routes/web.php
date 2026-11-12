@@ -47,6 +47,8 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])
         ->name('reviews.like');
 
+    Route::get('/favorites', [FavoriteController::class, 'index'])
+        ->name('favorites.index');
 });
 
 Route::get('/books/{book}', [BookController::class, 'show'])
