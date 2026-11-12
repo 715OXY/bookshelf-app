@@ -36,6 +36,10 @@ class FavoriteController extends Controller
             $user->favoriteBooks()->attach($book->getKey());
         });
 
+        if ($this->isFromFavorites($request)) {
+            return redirect()->route('favorites.index');
+        }
+
         return redirect()->route('books.show', $book);
     }
 
@@ -71,5 +75,37 @@ class FavoriteController extends Controller
         $books = $query->paginate(10, ['books.*'], 'page', $page);
 
         return view('favorites.index', compact('books'));
+    }
+
+    /**
+     * 同一オリジンのお気に入り一覧からの操作か判定する。
+     */
+    private function isFromFavorites(Request $request): bool
+    {
+        $referer = $request->headers->get('referer');
+
+        if ($referer === null) {
+            return false;
+        }
+
+        $parts = parse_url($referer);
+
+        if ($parts === false || isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = strtolower($parts['host'] ?? '');
+
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
+
+        return $scheme === $request->getScheme()
+            && $host === strtolower($request->getHost())
+            && $port === $request->getPort()
+            && ($parts['path'] ?? '') === '/favorites';
     }
 }
