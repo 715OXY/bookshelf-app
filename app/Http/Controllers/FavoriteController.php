@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Book;
 use App\Models\User;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,5 +37,39 @@ class FavoriteController extends Controller
         });
 
         return redirect()->route('books.show', $book);
+    }
+
+    /**
+     * 認証ユーザーのお気に入り書籍を10件ずつ表示する。
+     */
+    public function index(Request $request): View|RedirectResponse
+    {
+        $page = filter_var(
+            $request->query('page', 1),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+
+        if ($page === false) {
+            return redirect()->route('favorites.index');
+        }
+
+        $query = $request->user()->favoriteBooks()
+            ->orderByDesc('favorites.created_at')
+            ->orderByDesc('books.id');
+
+        $total = (clone $query)->count();
+        $lastPage = max(1, (int) ceil($total / 10));
+
+        if ($page > $lastPage) {
+            return redirect()->route(
+                'favorites.index',
+                $lastPage === 1 ? [] : ['page' => $lastPage]
+            );
+        }
+
+        $books = $query->paginate(10, ['books.*'], 'page', $page);
+
+        return view('favorites.index', compact('books'));
     }
 }
