@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\RegisteredUserController;
@@ -42,6 +43,10 @@ Route::middleware('auth:web')->group(function () {
 
     Route::post('/books/{book}/favorites', [FavoriteController::class, 'toggle'])
         ->name('favorites.toggle');
+
+    Route::post('/reviews/{review}/like', [ReviewLikeController::class, 'toggle'])
+        ->name('reviews.like');
+
 });
 
 Route::get('/books/{book}', [BookController::class, 'show'])
