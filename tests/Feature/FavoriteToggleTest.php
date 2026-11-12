@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Book;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class FavoriteToggleTest extends TestCase
@@ -104,17 +105,34 @@ class FavoriteToggleTest extends TestCase
         ]);
     }
 
-    public function test_認証済みでも削除された書籍への要求は404となる(): void
+    public function test_削除された書籍への要求は404となり他のお気に入りを保持する(): void
     {
         $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
         $book = Book::factory()->create();
         $bookId = $book->id;
         $book->delete();
 
+        $otherBook = Book::factory()->create();
+
+        $user->favoriteBooks()->attach($otherBook->id);
+        $otherUser->favoriteBooks()->attach($otherBook->id);
+
+        $before = DB::table('favorites')
+            ->orderBy('id')
+            ->get()
+            ->toArray();
+
         $this->actingAs($user, 'web')
             ->post('/books/'.$bookId.'/favorites')
-            ->assertNotFound();
+            ->assertNotFound()
+            ->assertHeaderMissing('Location')
+            ->assertSessionMissing('success');
 
-        $this->assertDatabaseCount('favorites', 0);
+        $this->assertEquals(
+            $before,
+            DB::table('favorites')->orderBy('id')->get()->toArray()
+        );
     }
 }
