@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
@@ -53,6 +54,27 @@ Route::middleware('auth:web')->group(function () {
 
     Route::get('/favorites', [FavoriteController::class, 'index'])
         ->name('favorites.index');
+
+    Route::get('/genres', [GenreController::class, 'index'])
+        ->name('genres.index');
+
+    Route::get('/genres/create', [GenreController::class, 'create'])
+        ->name('genres.create');
+
+    Route::post('/genres', [GenreController::class, 'store'])
+        ->name('genres.store');
+
+    Route::get('/genres/{genre}/edit', [GenreController::class, 'edit'])
+        ->name('genres.edit');
+
+    Route::put('/genres/{genre}', [GenreController::class, 'update'])
+        ->name('genres.update');
+
+    Route::delete('/genres/{genre}', [GenreController::class, 'destroy'])
+        ->name('genres.destroy');
+
+    Route::get('/genres/{genre}', [GenreController::class, 'show'])
+        ->name('genres.show');
 });
 
 Route::get('/books/{book}', [BookController::class, 'show'])
