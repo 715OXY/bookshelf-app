@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreGenreRequest;
+use App\Http\Requests\UpdateGenreRequest;
 use App\Models\Genre;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -50,15 +52,15 @@ class GenreController extends Controller
     }
 
     /**
-     * ジャンルを登録する。
-     *
-     * 登録処理はIssue #34で実装する。
+     * 検証済みのジャンル名を登録する。
      */
-    public function store(): RedirectResponse
+    public function store(StoreGenreRequest $request): RedirectResponse
     {
-        $this->authorize('create', Genre::class);
+        Genre::create($request->validated());
 
-        abort(501, 'ジャンル登録は未実装です。');
+        return redirect()
+            ->route('genres.index')
+            ->with('success', 'ジャンルを登録しました。');
     }
 
     /**
@@ -72,26 +74,39 @@ class GenreController extends Controller
     }
 
     /**
-     * ジャンルを更新する。
-     *
-     * 更新処理はIssue #34で実装する。
+     * 検証済みのジャンル名を更新する。
      */
-    public function update(Genre $genre): RedirectResponse
-    {
-        $this->authorize('update', $genre);
+    public function update(
+        UpdateGenreRequest $request,
+        Genre $genre
+    ): RedirectResponse {
+        $genre->update($request->validated());
 
-        abort(501, 'ジャンル更新は未実装です。');
+        return redirect()
+            ->route('genres.index')
+            ->with('success', 'ジャンルを更新しました。');
     }
 
     /**
-     * ジャンルを削除する。
-     *
-     * 削除処理はIssue #34で実装する。
+     * 書籍が紐付いていないジャンルを削除する。
      */
     public function destroy(Genre $genre): RedirectResponse
     {
         $this->authorize('delete', $genre);
 
-        abort(501, 'ジャンル削除は未実装です。');
+        if ($genre->books()->exists()) {
+            return redirect()
+                ->route('genres.index')
+                ->with(
+                    'error',
+                    '書籍が紐付いているため、このジャンルは削除できません。'
+                );
+        }
+
+        $genre->delete();
+
+        return redirect()
+            ->route('genres.index')
+            ->with('success', 'ジャンルを削除しました。');
     }
 }
