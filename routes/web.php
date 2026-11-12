@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,9 @@ use Laravel\Fortify\Http\Controllers\RegisteredUserController;
 
 Route::get('/', [BookController::class, 'index'])
     ->name('books.index');
+
+Route::get('/ranking', [RankingController::class, 'index'])
+    ->name('ranking.index');
 
 Route::middleware('auth:web')->group(function () {
     Route::get('/books/create', [BookController::class, 'create'])
