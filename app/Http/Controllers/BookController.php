@@ -117,6 +117,9 @@ class BookController extends Controller
         $book->load('genres');
         $genres = Genre::query()->orderBy('id')->get();
 
+        // 提供Bladeの日付入力へ、DBのDATE値を時刻なしで渡す。
+        $book->mergeCasts(['published_date' => 'string']);
+
         return view('books.edit', compact('book', 'genres'));
     }
 
