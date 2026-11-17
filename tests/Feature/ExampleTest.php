@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -11,8 +12,14 @@ class ExampleTest extends TestCase
 
     public function test_the_application_returns_a_successful_response(): void
     {
-        $this->markTestIncomplete(
-            '提供Bladeは変更禁止。ナビゲーションが参照する後続機能の実装後に、トップページの描画を再検証する。'
-        );
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('href="'.route('genres.index').'"', false);
+
+        $this->actingAs(User::factory()->create());
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('href="'.route('genres.index').'"', false);
     }
 }
