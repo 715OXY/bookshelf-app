@@ -15,9 +15,13 @@
 本文の詳細仕様は開発側の設計案であり、
 PMの明示回答による承認済み仕様とは区別する。
 
-2026年11月18日時点でIssue #43のFormRequest実装と
-入力検証・既存機能の回帰確認が完了している。
-正式APIルート・Controller・Resource・CRUDは後続Issueで実装する。
+2026年11月18日にIssue #43のFormRequest実装と
+入力検証・既存機能の回帰確認が完了した。
+
+2026年11月19日時点でIssue #44の正式APIルート、
+一覧・詳細取得Controller・Resourceの実装と検証が完了している。
+登録・更新・削除処理および共通JSON例外応答は
+Issue #45で実装する。
 
 ## 基本方針
 
@@ -52,14 +56,23 @@ PATCHは今回の対象外とする。
 | per_page | 任意・整数・1〜100 | 20 |
 
 - キーワードはタイトル・著者・ISBNの部分一致。
+- キーワードの各検索対象はOR条件でグループ化する。
 - ジャンル条件とはANDで組み合わせる。
+- LIKE特殊文字（%、_、!）は通常の文字として検索する。
+- ESCAPE句とパラメータバインディングを使用する。
 - 並び順はcreated_at降順、同日時はid降順。
 - ページネーションリンクに検索条件を引き継ぐ。
 - 最終ページを超える要求は空の一覧を返す。
 - 不正な入力値は422を返す。
 - ページ番号の上限は2147483647とする。
-- 極端なページ番号でOFFSET計算が破綻しないようにする。
-- OFFSET計算と範囲超過時の取得処理はIssue #44で実装・検証する。
+- 検索条件に一致する総件数を事前に取得する。
+- 有効なページ範囲内の場合のみforPageで書籍を取得する。
+- 範囲超過時は書籍取得SQLを発行せず空配列を返す。
+- LengthAwarePaginatorとAPI Resourceを使用する。
+- 範囲超過時も要求されたページ番号をcurrent_pageに保持する。
+- ページリンクはLaravel標準の生成方式を維持する。
+- ページリンクには検証済みの検索条件とページ件数を引き継ぐ。
+- 巨大OFFSET対策はIssue #44で実装・検証済み。
 
 ## 登録・更新の入力仕様
 
@@ -138,6 +151,7 @@ HTTP 204とし、レスポンスボディを返さない。
 | Status | 用途 |
 | --- | --- |
 | 404 | 対象書籍不存在 |
+| 405 | 許可されていないHTTPメソッド |
 | 422 | 入力検証エラー |
 | 429 | レート制限超過 |
 | 500 | サーバー内部エラー |
@@ -149,6 +163,9 @@ HTTP 204とし、レスポンスボディを返さない。
 - 内部SQL・接続情報・スタックトレースを公開しない。
 - 既存Webのエラー応答を変更しない。
 - HTTP標準のエラー用ヘッダーを維持する。
+- 詳細取得の404では「指定された書籍は存在しません。」を返す。
+- 一覧取得の422および詳細取得の404はIssue #44で検証済み。
+- 405・429・500を含む共通JSON例外応答はIssue #45で実装・検証する。
 
 ## データ整合性・取得効率
 
@@ -176,6 +193,28 @@ HTTP 204とし、レスポンスボディを返さない。
 - 更新時はuser_idとISBNの入力ルールを変更する。
 - ISBNの自身除外にはルートモデルバインディングを利用する。
 - 既存Web用FormRequestは変更しない。
+
+## Controller・Resourceの実装構成
+
+| ファイル | 責務 |
+| --- | --- |
+| routes/api.php | v1公開APIの5ルート定義 |
+| app/Http/Controllers/Api/V1/BookController.php | 一覧・詳細取得と書込APIの暫定応答 |
+| app/Http/Resources/Api/V1/BookResource.php | 書籍の共通公開項目 |
+| app/Http/Resources/Api/V1/BookDetailResource.php | 共通公開項目とレビュー情報 |
+| app/Http/Resources/Api/V1/GenreResource.php | ジャンルの公開項目 |
+| app/Http/Resources/Api/V1/ReviewResource.php | レビューと投稿者の公開項目 |
+
+- 一覧取得にはIndexBookRequestを使用する。
+- 詳細取得にはルートモデルバインディングを使用する。
+- BookDetailResourceはBookResourceを継承する。
+- 一覧ではwith・withAvg・withCountを使用する。
+- 詳細ではload・loadAvg・loadCountを使用する。
+- Resourceでは読み込み済みの関連情報と集計値を使用する。
+- 既存のModel・Migration・Web用Controllerは変更しない。
+- POST・PUT・DELETEはIssue #45まで暫定501応答とする。
+- 対象書籍不存在など、Controller到達前の例外は別途扱う。
+- 既存のauth:sanctum付きapi/userルートは維持する。
 
 ## 実装分担
 
@@ -246,11 +285,121 @@ MS9のテスト結果はIssueごとに記録する。
 今回の入力検証テストの成功を、
 正式API全体の動作検証完了とは扱わない。
 
+## Issue #44の実装・検証記録
+
+検証日：2026年11月19日
+
+作業ブランチ：feature/issue-44-api-read
+
+作業開始時の基準コミット：99a58f9
+
+### 実装範囲
+
+- AP01：書籍一覧取得API。
+- AP02：書籍詳細取得API。
+- AP03〜AP05：ルート定義と暫定501応答。
+- API専用Controllerおよび4種類のResource。
+- 正式APIを対象としたFeature Test。
+
+### 自動テスト
+
+テスト配置先：tests/Feature/Api/V1/
+
+| ファイル | テスト件数 | assertions |
+| --- | ---: | ---: |
+| BookReadTestCase.php | 共通基底クラス | - |
+| BookIndexTest.php | 7 | 71 |
+| BookIndexSearchTest.php | 9 | 71 |
+| BookIndexPaginationTest.php | 10 | 100 |
+| BookShowTest.php | 8 | 75 |
+| BookQueryEfficiencyTest.php | 3 | 35 |
+| 合計 | 37 | 352 |
+
+- RefreshDatabaseによる再現可能なテストを実装した。
+- DB初期化前にtesting環境・ドライバー・接続先DBを確認する。
+- 既存Factoryを再利用し、必要に応じてジャンル紐付けを同期する。
+- Issue #43の入力検証専用テストは変更していない。
+
+### 検証結果
+
+| 検証項目 | 結果 |
+| --- | --- |
+| 一覧取得APIの簡易HTTP検証 | 15件成功 |
+| 詳細取得APIの簡易HTTP検証 | 5件成功 |
+| 一覧・既存APIテスト一括実行 | 66件・403 assertions成功 |
+| 新規自動テスト | 37件・352 assertions成功 |
+| 全体回帰テスト | 361件・3450 assertions成功 |
+| 全体回帰テスト実行時間 | 16.16秒 |
+| PHP構文チェック | 16ファイル成功 |
+| Pint | 20ファイル成功 |
+| PHPファイル行数 | 確認対象16ファイルが200行以内 |
+| 既存Web機能への回帰影響 | テスト範囲内で検出されず |
+
+### SQL取得効率の実測値
+
+| 検証条件 | SELECT文発行回数 |
+| --- | ---: |
+| 一覧取得：書籍1件 | 3 |
+| 一覧取得：書籍10件 | 3 |
+| 詳細取得：レビュー1件 | 6 |
+| 詳細取得：レビュー10件 | 6 |
+| 最大ページ番号・100件指定 | 1 |
+
+- 書籍数・レビュー数の増加によるSQL発行回数の増加はない。
+- 最大ページ番号2147483647の要求では総件数取得のみを実行した。
+- OFFSET句およびLIMIT句を含むSELECT文は発行されなかった。
+- Resource単体のJSON変換時の追加SQL発行回数は0回だった。
+- 上記は指定した検証条件における実測値であり、
+  大規模データに対する負荷試験結果ではない。
+
+## Issue #44の不具合修正記録
+
+### レビュー0件の場合にaverage_ratingが欠落する
+
+- 発見工程：STEP 7-2-2。
+- 現象：レビューが存在しない場合にaverage_ratingの項目が欠落した。
+- 期待値：average_ratingはnull、reviews_countは0。
+- 原因：Laravel 10のwhenAggregated内部でissetを使用しており、
+  NULL集計値に対して既定のMissingValueが返された。
+- 修正：BookResourceのwhenAggregatedの第5引数にnullを指定した。
+- 影響範囲：BookResourceおよび継承先のBookDetailResource。
+- 再検証：修正前5件成功・2件失敗、修正後7件・71 assertions成功。
+- 詳細取得でもレビュー0件時のnull・0・空配列を検証済み。
+- Laravel内部ファイルおよびテスト期待値は変更していない。
+
+## Issue #44からの引継ぎ事項
+
+- #45：書籍登録・更新・削除処理の実装。
+- #45：トランザクション・ジャンル同期・関連削除の検証。
+- #45：登録・更新成功時のBookDetailResourceの再利用。
+- #45：PUTの任意項目省略時のNULL更新。
+- #45：405・429・500を含む共通JSON例外応答。
+- #45：ルート側の404応答と共通例外処理の整合性確認。
+- #45：HTTP標準のAllow・Retry-After等のヘッダー維持。
+- #46：正式API全体の統合検証・Web回帰確認・資料更新。
+- MS10：PHPとLaravel Sanctumの互換性警告の再確認。
+- PMへの設計内容の事後確認と要件シートへの反映。
+
+PATCH要求に対する405応答では、Acceptヘッダー省略時に
+HTML形式のデバッグ用エラー画面が返されることを確認した。
+共通JSON例外応答の実装時に解消する。
+
+Resource単体検証時にSanctumのcreateTokenメソッドについて
+暗黙的nullable型宣言のDEPRECATED警告が発生した。
+今回のJSON変換への影響は確認されていない。
+vendor配下の直接修正は行わず、互換性確認を後続へ引き継ぐ。
+
+Issue #44の検証成功を、書込APIを含む公開API全体の
+実装・検証完了とは扱わない。
+
 ## PM確認事項
 
 - ページ件数の既定値20件・上限100件
 - ページ番号の上限2147483647
 - キーワード検索の対象項目・一致条件
+- LIKE特殊文字を通常の文字として扱う検索仕様
+- 並び順と同一作成日時の場合のID降順
+- ページ範囲超過時の空配列・ページ情報・ページリンクの扱い
 - 登録者IDの指定方法と更新不可の扱い
 - PUTの任意項目省略時のNULL更新
 - JSONレスポンスの項目・構造・平均評価の精度
