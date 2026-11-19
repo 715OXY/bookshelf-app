@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Book;
+use App\Models\Genre;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -323,5 +324,316 @@ class DatabaseConstraintsTest extends TestCase
             ->toArray();
 
         $this->assertEquals($likesBefore, $likesAfter);
+    }
+
+    public function test_同じメールアドレスをデータベースへ重複登録できない(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'duplicate@example.com',
+        ]);
+
+        $before = $user->fresh()->getRawOriginal();
+
+        try {
+            DB::table('users')->insert([
+                'name' => '別のユーザー',
+                'email' => $user->email,
+                'password' => $user->password,
+            ]);
+        } catch (QueryException $exception) {
+            $this->assertSame(1062, $exception->errorInfo[1]);
+            $this->assertStringContainsString(
+                'users_email_unique',
+                $exception->getMessage()
+            );
+
+            $this->assertDatabaseCount('users', 1);
+            $this->assertSame(
+                $before,
+                $user->fresh()->getRawOriginal()
+            );
+
+            return;
+        }
+
+        $this->fail('メールアドレスが重複登録されました。');
+    }
+
+    public function test_同じジャンル名をデータベースへ重複登録できない(): void
+    {
+        $genre = Genre::factory()->create([
+            'name' => '技術書',
+        ]);
+
+        $before = $genre->fresh()->getRawOriginal();
+
+        try {
+            DB::table('genres')->insert([
+                'name' => $genre->name,
+            ]);
+        } catch (QueryException $exception) {
+            $this->assertSame(1062, $exception->errorInfo[1]);
+            $this->assertStringContainsString(
+                'genres_name_unique',
+                $exception->getMessage()
+            );
+
+            $this->assertDatabaseCount('genres', 1);
+            $this->assertSame(
+                $before,
+                $genre->fresh()->getRawOriginal()
+            );
+
+            return;
+        }
+
+        $this->fail('ジャンル名が重複登録されました。');
+    }
+
+    /**
+     * @dataProvider referencedUserProvider
+     */
+    public function test_関連データから参照されているユーザーは削除できない(
+        string $table,
+        string $constraint
+    ): void {
+        $user = User::factory()->create();
+        $owner = User::factory()->create();
+        $book = Book::factory()->for($owner)->create();
+
+        $row = match ($table) {
+            'reviews' => [
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+                'rating' => 3,
+            ],
+            'favorites' => [
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+            ],
+            'review_likes' => [
+                'user_id' => $user->id,
+                'review_id' => Review::factory()
+                    ->for($owner)
+                    ->for($book)
+                    ->create()->id,
+            ],
+        };
+
+        DB::table($table)->insert($row);
+
+        $before = $user->fresh()->getRawOriginal();
+
+        try {
+            $user->delete();
+        } catch (QueryException $exception) {
+            $this->assertSame(1451, $exception->errorInfo[1]);
+            $this->assertStringContainsString(
+                $constraint,
+                $exception->getMessage()
+            );
+
+            $this->assertSame(
+                $before,
+                $user->fresh()->getRawOriginal()
+            );
+
+            $this->assertDatabaseHas($table, $row);
+            $this->assertDatabaseHas('users', ['id' => $owner->id]);
+            $this->assertDatabaseHas('books', ['id' => $book->id]);
+
+            return;
+        }
+
+        $this->fail('関連データから参照されているユーザーが削除されました。');
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function referencedUserProvider(): array
+    {
+        return [
+            'reviews' => [
+                'reviews',
+                'reviews_user_id_foreign',
+            ],
+            'favorites' => [
+                'favorites',
+                'favorites_user_id_foreign',
+            ],
+            'review likes' => [
+                'review_likes',
+                'review_likes_user_id_foreign',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider validRatingBoundaryProvider
+     */
+    public function test_正常境界値の評価をデータベースへ登録できる(
+        int $rating
+    ): void {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+
+        $reviewId = DB::table('reviews')->insertGetId([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'rating' => $rating,
+            'comment' => null,
+        ]);
+
+        $this->assertDatabaseCount('reviews', 1);
+
+        $this->assertDatabaseHas('reviews', [
+            'id' => $reviewId,
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'rating' => $rating,
+            'comment' => null,
+        ]);
+
+        $review = Review::findOrFail($reviewId);
+
+        $this->assertSame($rating, $review->rating);
+        $this->assertNull($review->comment);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function validRatingBoundaryProvider(): array
+    {
+        return [
+            'minimum' => [1],
+            'maximum' => [5],
+        ];
+    }
+
+    /**
+     * @dataProvider missingForeignKeyProvider
+     */
+    public function test_存在しない外部キーを指定して登録できない(
+        string $table,
+        string $column,
+        string $parentTable,
+        string $constraint
+    ): void {
+        $user = User::factory()->create();
+        $book = Book::factory()->for($user)->create();
+        $genre = Genre::factory()->create();
+        $review = Review::factory()
+            ->for($user)
+            ->for($book)
+            ->create();
+
+        $row = match ($table) {
+            'reviews' => [
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+                'rating' => 3,
+            ],
+            'book_genres' => [
+                'book_id' => $book->id,
+                'genre_id' => $genre->id,
+            ],
+            'favorites' => [
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+            ],
+            'review_likes' => [
+                'user_id' => $user->id,
+                'review_id' => $review->id,
+            ],
+        };
+
+        $missingId = (int) DB::table($parentTable)->max('id') + 1;
+
+        $this->assertDatabaseMissing($parentTable, [
+            'id' => $missingId,
+        ]);
+
+        $row[$column] = $missingId;
+
+        $before = DB::table($table)
+            ->orderBy('id')
+            ->get()
+            ->toArray();
+
+        try {
+            DB::table($table)->insert($row);
+        } catch (QueryException $exception) {
+            $this->assertSame(1452, $exception->errorInfo[1]);
+            $this->assertStringContainsString(
+                $constraint,
+                $exception->getMessage()
+            );
+
+            $this->assertDatabaseMissing($table, $row);
+
+            $after = DB::table($table)
+                ->orderBy('id')
+                ->get()
+                ->toArray();
+
+            $this->assertEquals($before, $after);
+
+            return;
+        }
+
+        $this->fail('存在しない外部キーを持つデータが登録されました。');
+    }
+
+    /**
+     * @return array<string, array{string, string, string, string}>
+     */
+    public static function missingForeignKeyProvider(): array
+    {
+        return [
+            'reviews user' => [
+                'reviews',
+                'user_id',
+                'users',
+                'reviews_user_id_foreign',
+            ],
+            'reviews book' => [
+                'reviews',
+                'book_id',
+                'books',
+                'reviews_book_id_foreign',
+            ],
+            'book genres book' => [
+                'book_genres',
+                'book_id',
+                'books',
+                'book_genres_book_id_foreign',
+            ],
+            'favorites user' => [
+                'favorites',
+                'user_id',
+                'users',
+                'favorites_user_id_foreign',
+            ],
+            'favorites book' => [
+                'favorites',
+                'book_id',
+                'books',
+                'favorites_book_id_foreign',
+            ],
+            'review likes user' => [
+                'review_likes',
+                'user_id',
+                'users',
+                'review_likes_user_id_foreign',
+            ],
+            'review likes review' => [
+                'review_likes',
+                'review_id',
+                'reviews',
+                'review_likes_review_id_foreign',
+            ],
+        ];
     }
 }
