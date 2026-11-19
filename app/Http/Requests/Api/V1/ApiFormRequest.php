@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Exceptions\ApiValidationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
 
 abstract class ApiFormRequest extends FormRequest
 {
@@ -19,15 +19,12 @@ abstract class ApiFormRequest extends FormRequest
     /**
      * 入力不備時はJSON形式のエラーを返す。
      *
-     * @throws HttpResponseException
+     * @throws ApiValidationException
      */
     protected function failedValidation(Validator $validator): void
     {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => '入力内容に誤りがあります。',
-                'errors' => $validator->errors(),
-            ], 422)
+        throw new ApiValidationException(
+            $validator->errors()->toArray()
         );
     }
 }

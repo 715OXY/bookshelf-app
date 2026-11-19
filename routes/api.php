@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\V1\BookController;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -25,12 +24,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         ->name('books.index');
 
     Route::get('/books/{book}', [BookController::class, 'show'])
-        ->name('books.show')
-        ->missing(function (): JsonResponse {
-            return response()->json([
-                'message' => '指定された書籍は存在しません。',
-            ], 404);
-        });
+        ->name('books.show');
 
     Route::post('/books', [BookController::class, 'store'])
         ->name('books.store');

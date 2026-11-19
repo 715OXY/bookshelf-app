@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\IndexBookRequest;
+use App\Http\Requests\Api\V1\StoreBookRequest;
+use App\Http\Requests\Api\V1\UpdateBookRequest;
 use App\Http\Resources\Api\V1\BookDetailResource;
 use App\Http\Resources\Api\V1\BookResource;
 use App\Models\Book;
+use App\Services\Api\V1\BookWriteService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class BookController extends Controller
@@ -56,35 +60,75 @@ class BookController extends Controller
      */
     public function show(Book $book): BookDetailResource
     {
-        $book->load(['genres', 'reviews.user']);
-        $book->loadAvg('reviews', 'rating');
-        $book->loadCount('reviews');
-
-        return new BookDetailResource($book);
+        return $this->detailResource($book);
     }
 
     /**
      * 書籍を登録する。
      */
-    public function store(): JsonResponse
-    {
-        return $this->notImplemented();
+    public function store(
+        StoreBookRequest $request,
+        BookWriteService $service
+    ): JsonResponse {
+        $attributes = $request->safe()->except('genres');
+        $attributes['description'] = $attributes['description'] ?? null;
+        $attributes['image_url'] = $attributes['image_url'] ?? null;
+
+        $book = $service->store(
+            $attributes,
+            $request->validated('genres')
+        );
+
+        return $this->detailResource($book)
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
      * 書籍を更新する。
      */
-    public function update(Book $book): JsonResponse
-    {
-        return $this->notImplemented();
+    public function update(
+        UpdateBookRequest $request,
+        Book $book,
+        BookWriteService $service
+    ): JsonResponse {
+        $attributes = $request->safe()->except(['genres', 'user_id']);
+        $attributes['description'] = $attributes['description'] ?? null;
+        $attributes['image_url'] = $attributes['image_url'] ?? null;
+
+        $book = $service->update(
+            $book,
+            $attributes,
+            $request->validated('genres')
+        );
+
+        return $this->detailResource($book)
+            ->response()
+            ->setStatusCode(200);
     }
 
     /**
      * 書籍を削除する。
      */
-    public function destroy(Book $book): JsonResponse
+    public function destroy(
+        Book $book,
+        BookWriteService $service
+    ): Response {
+        $service->destroy($book);
+
+        return response()->noContent();
+    }
+
+    /**
+     * 書籍詳細の関連情報を取得してResourceを生成する。
+     */
+    private function detailResource(Book $book): BookDetailResource
     {
-        return $this->notImplemented();
+        $book->load(['genres', 'reviews.user']);
+        $book->loadAvg('reviews', 'rating');
+        $book->loadCount('reviews');
+
+        return new BookDetailResource($book);
     }
 
     /**
@@ -127,15 +171,5 @@ class BookController extends Controller
         return $query
             ->orderByDesc('created_at')
             ->orderByDesc('id');
-    }
-
-    /**
-     * 未実装のAPI操作に対する暫定応答。
-     */
-    private function notImplemented(): JsonResponse
-    {
-        return response()->json([
-            'message' => 'このAPIは現在実装中です。',
-        ], 501);
     }
 }

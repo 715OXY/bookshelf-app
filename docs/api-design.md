@@ -20,8 +20,9 @@ PMの明示回答による承認済み仕様とは区別する。
 
 2026年11月19日時点でIssue #44の正式APIルート、
 一覧・詳細取得Controller・Resourceの実装と検証が完了している。
-登録・更新・削除処理および共通JSON例外応答は
-Issue #45で実装する。
+2026年11月19日にIssue #45の登録・更新・削除処理、
+共通JSON例外応答および実装範囲の検証が完了した。
+正式API全体の最終検証・提出資料との照合はIssue #46で行う。
 
 ## 基本方針
 
@@ -150,14 +151,14 @@ HTTP 204とし、レスポンスボディを返さない。
 
 | Status | 用途 |
 | --- | --- |
-| 404 | 対象書籍不存在 |
+| 404 | 対象書籍不存在・未定義API |
 | 405 | 許可されていないHTTPメソッド |
-| 422 | 入力検証エラー |
+| 422 | 入力検証エラー・分類対象のDB制約違反 |
 | 429 | レート制限超過 |
 | 500 | サーバー内部エラー |
 
 - 共通のmessage項目を日本語で返す。
-- 422ではerrorsに項目別のメッセージ配列を格納する。
+- 入力検証および分類対象のDB制約違反による422では、errorsに項目別のメッセージ配列を格納する。
 - 422の共通messageは「入力内容に誤りがあります。」とする。
 - Acceptヘッダー省略時もJSONで返す。
 - 内部SQL・接続情報・スタックトレースを公開しない。
@@ -165,7 +166,22 @@ HTTP 204とし、レスポンスボディを返さない。
 - HTTP標準のエラー用ヘッダーを維持する。
 - 詳細取得の404では「指定された書籍は存在しません。」を返す。
 - 一覧取得の422および詳細取得の404はIssue #44で検証済み。
-- 405・429・500を含む共通JSON例外応答はIssue #45で実装・検証する。
+- 405・429・500を含む共通JSON例外応答はIssue #45で実装・検証済み。
+- 共通例外処理の対象はapi/v1およびその配下とする。
+- その他のAPIおよびWebの例外処理は既存方針を維持する。
+- 405ではAllow、429ではRetry-After等の必要なヘッダーを維持する。
+- デバッグ設定の有無によらず予期しない内部例外の詳細を公開しない。
+
+### 共通エラーメッセージ
+
+| Status | message |
+| --- | --- |
+| 404（書籍不存在） | 指定された書籍は存在しません。 |
+| 404（未定義API） | 指定されたAPIは存在しません。 |
+| 405 | 許可されていないHTTPメソッドです。 |
+| 422 | 入力内容に誤りがあります。 |
+| 429 | リクエスト回数が上限を超えました。 |
+| 500 | サーバー内部でエラーが発生しました。 |
 
 ## データ整合性・取得効率
 
@@ -175,6 +191,11 @@ HTTP 204とし、レスポンスボディを返さない。
 - 無関係な書籍・ユーザー・ジャンルは保持する。
 - Eager Loadingと関連集計によってN+1を回避する。
 - 既存の60リクエスト/分のレート制限を維持する。
+- 登録・更新時は書籍本体とジャンル同期を同一トランザクションで処理する。
+- 更新時は登録者・レビュー・お気に入り・レビューいいねを保持する。
+- 削除時は既存の外部キー制約による連鎖削除を利用する。
+- トランザクション内の処理失敗時は部分変更をロールバックする。
+- コミット後のResource取得・応答生成障害はロールバック保証範囲外とする。
 
 ## FormRequestの実装構成
 
@@ -193,13 +214,14 @@ HTTP 204とし、レスポンスボディを返さない。
 - 更新時はuser_idとISBNの入力ルールを変更する。
 - ISBNの自身除外にはルートモデルバインディングを利用する。
 - 既存Web用FormRequestは変更しない。
+- ApiFormRequestはApiValidationExceptionを使用して422 JSON応答を生成する。
 
 ## Controller・Resourceの実装構成
 
 | ファイル | 責務 |
 | --- | --- |
 | routes/api.php | v1公開APIの5ルート定義 |
-| app/Http/Controllers/Api/V1/BookController.php | 一覧・詳細取得と書込APIの暫定応答 |
+| app/Http/Controllers/Api/V1/BookController.php | 書籍CRUD・Resourceによる応答生成 |
 | app/Http/Resources/Api/V1/BookResource.php | 書籍の共通公開項目 |
 | app/Http/Resources/Api/V1/BookDetailResource.php | 共通公開項目とレビュー情報 |
 | app/Http/Resources/Api/V1/GenreResource.php | ジャンルの公開項目 |
@@ -212,9 +234,46 @@ HTTP 204とし、レスポンスボディを返さない。
 - 詳細ではload・loadAvg・loadCountを使用する。
 - Resourceでは読み込み済みの関連情報と集計値を使用する。
 - 既存のModel・Migration・Web用Controllerは変更しない。
-- POST・PUT・DELETEはIssue #45まで暫定501応答とする。
-- 対象書籍不存在など、Controller到達前の例外は別途扱う。
+- POST・PUT・DELETEの暫定501応答はIssue #45で正式処理へ置換した。
+- 登録・更新・削除の永続化処理はBookWriteServiceへ委譲する。
+- 登録・更新の成功応答にはBookDetailResourceを再利用する。
+- 対象書籍不存在などの例外はHandlerとApiExceptionRendererで処理する。
 - 既存のauth:sanctum付きapi/userルートは維持する。
+
+## Service・例外処理の実装構成
+
+| ファイル | 責務 |
+| --- | --- |
+| app/Services/Api/V1/BookWriteService.php | 書籍の永続化・ジャンル同期・トランザクション |
+| app/Exceptions/Handler.php | APIとWebの例外処理の分離 |
+| app/Exceptions/ApiExceptionRenderer.php | API共通JSON例外応答 |
+| app/Exceptions/ApiValidationException.php | 入力検証用の422 JSON応答 |
+| app/Exceptions/BookConstraintViolation.php | 特定のDB制約違反の分類 |
+
+### DB制約違反への対応
+
+入力検証とDB書き込みの間にデータが変化する可能性を考慮し、
+以下の既存DB制約に対応するQueryExceptionを422へ変換する。
+
+| DB制約 | errorsの対象項目 |
+| --- | --- |
+| books_isbn_unique | isbn |
+| books_user_id_foreign | user_id |
+| book_genres_genre_id_foreign | genres |
+
+- MySQLのSQLSTATE・エラー番号・制約名を用いて分類する。
+- 分類対象外のQueryExceptionは共通500応答とする。
+- DB例外の原文・SQL・内部接続情報は公開しない。
+- 既存MigrationおよびDB制約は変更しない。
+
+### 例外応答の安全性
+
+- 正規の入力検証にはApiValidationExceptionを使用する。
+- ApiExceptionRendererで任意のHttpResponseExceptionを直接返却しない。
+- BookWriteService内のHttpResponseExceptionはRuntimeExceptionへ変換する。
+- 元の例外はpreviousとして保持し、クライアントへ公開しない。
+- Laravelのvendor配下は変更しない。
+- Service外で発生する全HttpResponseExceptionを包括的に防ぐ仕組みではない。
 
 ## 実装分担
 
@@ -392,6 +451,163 @@ vendor配下の直接修正は行わず、互換性確認を後続へ引き継�
 Issue #44の検証成功を、書込APIを含む公開API全体の
 実装・検証完了とは扱わない。
 
+## Issue #45の実装・検証記録
+
+検証日：2026年11月19日
+
+作業ブランチ：feature/issue-45-api-write
+
+作業開始時の基準コミット：0c56aa5
+
+### 実装範囲
+
+- AP03：書籍登録API。
+- AP04：書籍更新API。
+- AP05：書籍削除API。
+- トランザクション・ジャンル同期・関連削除。
+- API共通JSON例外応答とDB制約違反の分類。
+- 入力検証専用例外と書き込み処理の安全性補強。
+- API書き込み・例外処理・統合検証用のFeature Test。
+
+### 自動テスト
+
+テスト配置先：tests/Feature/Api/V1/
+
+| ファイル | テスト件数 | assertions |
+| --- | ---: | ---: |
+| BookWriteTestCase.php | 共通基底クラス | - |
+| BookStoreTest.php | 5 | 57 |
+| BookUpdateTest.php | 5 | 63 |
+| BookDestroyTest.php | 3 | 33 |
+| BookWriteConflictTest.php | 5 | 40 |
+| ApiExceptionTest.php | 8 | 81 |
+| ApiRateLimitTest.php | 3 | 458 |
+| BookWriteTransactionTest.php | 3 | 42 |
+| ApiExceptionSafetyTest.php | 4 | 51 |
+| BookApiIntegrationTest.php | 1 | 50 |
+| 合計 | 37 | 875 |
+
+- RefreshDatabaseを使用する。
+- DB初期化前にtesting環境・MySQL・テスト専用DBを確認する。
+- 実際のDB制約違反およびSQL実行直後の障害をテスト内で再現する。
+- 関連7テーブルの状態を比較し、部分変更が残らないことを確認する。
+- レート制限超過・接続元の分離・制限時間経過後の復帰を確認する。
+- 未認証での書籍登録から削除までのライフサイクルを確認する。
+
+### 検証結果
+
+| 検証項目 | 結果 |
+| --- | --- |
+| 新規自動テスト | 37件・875 assertions成功 |
+| 公開API一括テスト（統合テスト追加前） | 113件・1338 assertions成功 |
+| ライフサイクル統合テスト | 1件・50 assertions成功 |
+| 全体回帰テスト | 398件・4325 assertions成功 |
+| 全体回帰テスト実行時間 | 19.50秒 |
+| 参照系・異常系HTTP疎通確認 | 5件成功 |
+| 書き込み系HTTP疎通確認 | 8件成功 |
+| HTTP疎通確認合計 | 13件成功 |
+| PHP構文チェック | 18ファイル成功 |
+| Pint | 18ファイル成功 |
+| PHPファイル行数 | 全18ファイル200行以内 |
+| 最大PHPファイル行数 | 175行 |
+| Git差分チェック | 全18ファイル合格 |
+| 既存Web機能への回帰影響 | テスト範囲内で検出されず |
+
+公開API関連テストは統合テストを含めて114件となった。
+
+### SQL取得効率の回帰確認
+
+| 検証条件 | SELECT文発行回数 |
+| --- | ---: |
+| 一覧取得：書籍1件 | 3 |
+| 一覧取得：書籍10件 | 3 |
+| 詳細取得：レビュー1件 | 6 |
+| 詳細取得：レビュー10件 | 6 |
+| 最大ページ番号指定 | 1 |
+
+Issue #44の検証結果からクエリ数の増加は確認されなかった。
+実データを用いた負荷試験ではない。
+
+### HTTP疎通確認
+
+検証環境：Sail・PHP 8.5.12・MySQL 8.4。
+
+接続先：http://localhost/api/v1/books
+
+| 検証内容 | HTTP Status |
+| --- | ---: |
+| 書籍一覧取得 | 200 |
+| 不存在書籍の詳細取得 | 404 |
+| 未定義API | 404 |
+| 未許可メソッド | 405 |
+| 不正な一覧取得条件 | 422 |
+| 検証専用書籍の登録 | 201 |
+| 登録後の詳細取得 | 200 |
+| 不正な書籍更新 | 422 |
+| 正常な書籍更新 | 200 |
+| 更新後の詳細取得 | 200 |
+| 更新後の一覧取得 | 200 |
+| 検証専用書籍の削除 | 204 |
+| 削除後の詳細取得 | 404 |
+
+- 認証情報およびAcceptヘッダーを明示せずに検証した。
+- 405応答でAllowヘッダーが維持されることを確認した。
+- レート制限関連ヘッダーを確認した。
+- 204応答の本文が空であることを確認した。
+- 開発用DBの既存データを保護し、検証専用書籍のみを操作した。
+
+### 開発用DBの整合性確認
+
+| テーブル | 検証前 | 検証後 |
+| --- | ---: | ---: |
+| users | 5 | 5 |
+| books | 11 | 11 |
+| genres | 10 | 10 |
+| reviews | 32 | 32 |
+| book_genres | 16 | 16 |
+| favorites | 19 | 19 |
+| review_likes | 48 | 48 |
+| 合計 | 141 | 141 |
+
+- 全7テーブルについてレコード件数とSHA-256ハッシュ値が一致した。
+- 検証専用書籍は削除済み。
+- AUTO_INCREMENTの進行は許容する。
+- 個人情報等のレコード内容は検証結果に出力していない。
+
+## Issue #45の不具合修正記録
+
+### HttpResponseExceptionが共通JSON例外処理を迂回する
+
+- 発見工程：STEP 7-3-3。
+- 現象：意図的に発生させたHttpResponseExceptionのHTML・JSON・
+  リダイレクト応答が直接返された。
+- 期待値：安全な500 JSON応答に変換される。
+- 原因：LaravelのRoute::run()がHttpResponseExceptionを直接捕捉し、
+  Handlerを経由せずgetResponse()を返す。
+- 修正：BookWriteServiceでHttpResponseExceptionを捕捉し、
+  RuntimeExceptionへ変換して再送出する。
+- 影響範囲：BookWriteServiceの共通トランザクション処理。
+- 再検証：修正前1件成功・3件失敗、
+  修正後4件・51 assertions成功。
+- トランザクション・DB制約違反の回帰テスト8件・82 assertions成功。
+- vendor配下およびテストの期待値は変更していない。
+- Service外の全例外経路を包括的に保護するものではない。
+
+## Issue #45からの引継ぎ事項
+
+- #46：基本API全体の最終統合検証・既存Web機能の回帰確認。
+- #46：README・要件シート・API詳細仕様・テストケースとの照合。
+- #46：HTTPエラー応答および実装仕様の最終確認。
+- 実際の並行リクエストによる競合試験は未実施。
+- DB制約違反テストはテスト内で競合相当の状態を再現したものである。
+- 大規模データおよび並行リクエストによる負荷試験は未実施。
+- コミット後の応答生成障害はロールバック保証範囲外。
+- MS10：Sanctum認証・所有者認可の追加と互換性確認。
+- PMへの設計内容の事後確認と要件シートへの反映。
+
+Issue #45の実装・検証成功は、MS9の全工程完了や
+PMによる明示承認を意味するものではない。
+
 ## PM確認事項
 
 - ページ件数の既定値20件・上限100件
@@ -404,13 +620,19 @@ Issue #44の検証成功を、書込APIを含む公開API全体の
 - PUTの任意項目省略時のNULL更新
 - JSONレスポンスの項目・構造・平均評価の精度
 - HTTPステータス・エラー応答形式
+- 特定のDB制約違反を422として扱う方針
+- Serviceによる永続化処理の分離と例外応答の安全性補強
+- トランザクションの保証範囲
 
 ## 応用機能への引継ぎ
 
 - POST・PUT・DELETEにSanctum認証を追加する。
 - 登録者IDは認証済みユーザーから取得する方式へ変更する。
 - 更新・削除にBookPolicyによる所有者認可を追加する。
-- 401・403のJSON応答を設計する。
+- 401・403のJSON応答を設計・検証する。
+- 現行のApiFormRequest・BookWriteService・ApiExceptionRendererを再評価する。
+- 基本APIの未認証書き込みから認証・所有者認可付きの仕様へ移行する。
+- SanctumのPHP互換性警告を再確認する。
 
 ## 資料反映先
 
