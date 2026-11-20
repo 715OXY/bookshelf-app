@@ -14,7 +14,7 @@ Laravelを用いて、書籍レビューアプリケーションを開発しま�
 
 ## 主な機能と実装状況
 
-2026年11月19日時点の実装・検証状況。
+2026年11月20日時点の実装・検証状況。
 
 | 区分 | 機能 | 状態 |
 |---|---|---|
@@ -48,23 +48,45 @@ Laravelを用いて、書籍レビューアプリケーションを開発しま�
 
 ## 開発状況
 
-更新日：2026年11月19日
+更新日：2026年11月20日
 
-現在は、マイルストーン9の公開APIについて、
-最終統合検証と資料更新を進めています。
+マイルストーン10の基本機能について、
+最終統合回帰検証を実施した。
 
-- MS1〜MS8の既存機能を実装済み。
-- 公開APIの基本要件AP01〜AP05を実装・動作検証済み。
-- 全体回帰テスト443件・4949 assertions成功。
-- 公開APIテスト159件・2012 assertions成功。
-- 最終HTTP疎通確認19件成功。
-- 開発用DBの関連7テーブルについて、HTTP検証前後の内容一致を確認済み。
-- 既存Web機能への回帰影響は自動テストの範囲内で検出されていない。
+- MS1〜MS9の基本機能を実装済み。
+- 公開APIの基本要件AP01〜AP05を実装・検証済み。
+- 基本機能の最終自動検証は624件を実行。
+- PASS表示623件、非推奨警告を伴うテスト1件。
+- 失敗・スキップ・未完了0件。
+- 応用機能は未実装。
 
-MS9の最終コミット・PRマージ・要件シートへの反映は別途管理します。
-応用APIの認証・認可、PM確認事項、未実施の検証は後続工程に引き継ぎます。
+### 基本機能の最終品質指標
 
-新規取得環境でのREADME手順の再現検証は未実施です。
+| 項目 | 実測値 |
+|---|---:|
+| Unit Test | 23件 |
+| Feature Test | 601件 |
+| 全体テスト | 624件 |
+| Assertions | 7175 |
+| 行カバレッジ | 93.94% |
+| メソッドカバレッジ | 90.07% |
+| クラスカバレッジ | 78.57% |
+| Laravel Pint | 208ファイルPASS |
+| N+1比較検証 | 11ケースで増加なし |
+| 障害注入テスト | 16件成功 |
+
+基本機能の行カバレッジ60%超の目標を達成した。
+
+詳細は[MS10最終統合検証記録](docs/ms10-final-verification.md)、
+[基本機能テスト要件対応表](docs/ms10-test-matrix.md)を参照する。
+
+上記はIssue #56のコミット前に計測した結果である。
+最終コミット・PR・要件シートへの反映は別途管理する。
+
+PM確認事項、応用機能、実際の並行競合試験、
+大規模負荷試験は今回の検証完了範囲と区別する。
+
+新規取得環境でのREADME手順の再現検証は未実施である。
 
 ## 設定情報の取り扱い
 
@@ -371,6 +393,7 @@ PHPバージョンに応じた定数を使用するよう変更した。
 
 - 基本業務テーブル：books / genres / reviews / book_genres / favorites / review_likes
 - users・2FA列を含む基本7テーブルを、テーブル仕様書・ER図と照合済み。
+- 現行の構成は[基本DB設計・ER図](docs/database-design.md)を参照する。
 - Model・Factory・双方向リレーションを実装済み。
 - 複数レビュー、自己いいね、中間テーブルの重複禁止、評価CHECK、削除時動作の対象テストが成功。
 - 全Seederをテスト用DBへ投入し、指定値・件数・関連・パスワードのハッシュを確認済み。
@@ -379,6 +402,67 @@ PHPバージョンに応じた定数を使用するよう変更した。
 - 投入後件数：ユーザー5、ジャンル10、書籍11、レビュー32、書籍ジャンル紐付け16、お気に入り19、レビューいいね48。
 - 全書籍の登録者が山田太郎であることを確認。投入後の全テストも76件・1017アサーション成功。
 - 新規取得環境でのREADME全手順の再現検証は未実施。
+
+### 基本DBのER図
+
+```mermaid
+erDiagram
+    users ||--o{ books : registers
+    users ||--o{ reviews : posts
+    books ||--o{ reviews : receives
+    books ||--o{ book_genres : has
+    genres ||--o{ book_genres : classifies
+    users ||--o{ favorites : registers
+    books ||--o{ favorites : receives
+    users ||--o{ review_likes : registers
+    reviews ||--o{ review_likes : receives
+
+    users {
+        bigint id PK
+        string email UK
+    }
+
+    books {
+        bigint id PK
+        bigint user_id FK
+        string isbn UK
+        date published_date
+    }
+
+    genres {
+        bigint id PK
+        string name UK
+    }
+
+    reviews {
+        bigint id PK
+        bigint user_id FK
+        bigint book_id FK
+        tinyint rating
+        text comment
+    }
+
+    book_genres {
+        bigint id PK
+        bigint book_id FK
+        bigint genre_id FK
+    }
+
+    favorites {
+        bigint id PK
+        bigint user_id FK
+        bigint book_id FK
+    }
+
+    review_likes {
+        bigint id PK
+        bigint user_id FK
+        bigint review_id FK
+    }
+```
+
+外部キー・削除時動作・主要制約の詳細は、
+[基本DB設計・ER図](docs/database-design.md)を参照する。
 
 ### 初期データの投入
 
@@ -439,7 +523,7 @@ Migration適用済みで、ユーザー・業務データが空の場合は次�
 ベースURL：`http://localhost/api/v1`
 
 基本版（MS9）では、以下の5操作に認証を要求しない。
-応用版（MS10）では、書き込み操作にSanctum認証と必要な認可を追加する。
+応用機能の実装工程では、書き込み操作にSanctum認証と必要な認可を追加する。
 
 基本版の未認証書き込みは課題の検証用仕様であり、
 外部公開環境での運用を想定したものではない。
@@ -546,7 +630,7 @@ PUTではuser_idを送信しない。
     "message": "入力内容に誤りがあります。",
     "errors": {
         "title": [
-            "タイトルを入力してください。"
+            "タイトルは必須です。"
         ]
     }
 }
@@ -589,8 +673,11 @@ PM確認事項と例外処理の保証範囲についてはAPI詳細設計を参
 検証結果は基準コミットにIssue #46の追加テスト4ファイルを
 加えた時点のもの。最終コミットIDはPR本文に記録する。
 
+上記はIssue #46の検証時点の履歴である。
+その後、MS10でコードカバレッジを計測した。
+
 大規模負荷試験、実際の並行競合試験、
-コードカバレッジの数値計測、新規取得環境での再現検証は未実施。
+新規取得環境での再現検証は引き続き未実施。
 
 ## 設計・検証資料
 
@@ -602,3 +689,9 @@ PM確認事項と例外処理の保証範囲についてはAPI詳細設計を参
 - [MS8統合検証記録](docs/ms8-verification.md)
 - [公開API詳細設計](docs/api-design.md)
 - [MS9統合検証記録](docs/ms9-verification.md)
+- [基本DB設計・ER図](docs/database-design.md)
+- [MS10テスト環境・基準検証記録](docs/ms10-test-environment.md)
+- [MS10モデル・DB関連検証記録](docs/ms10-model-verification.md)
+- [MS10基本機能Feature Test検証記録](docs/ms10-feature-verification.md)
+- [MS10基本機能テスト要件対応表](docs/ms10-test-matrix.md)
+- [MS10最終統合検証記録](docs/ms10-final-verification.md)

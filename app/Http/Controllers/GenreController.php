@@ -8,6 +8,7 @@ use App\Models\Genre;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GenreController extends Controller
 {
@@ -81,7 +82,11 @@ class GenreController extends Controller
      */
     public function store(StoreGenreRequest $request): RedirectResponse
     {
-        Genre::create($request->validated());
+        $this->authorize('create', Genre::class);
+
+        DB::transaction(function () use ($request): void {
+            Genre::create($request->validated());
+        });
 
         return redirect()
             ->route('genres.index')
@@ -105,7 +110,11 @@ class GenreController extends Controller
         UpdateGenreRequest $request,
         Genre $genre
     ): RedirectResponse {
-        $genre->update($request->validated());
+        $this->authorize('update', $genre);
+
+        DB::transaction(function () use ($request, $genre): void {
+            $genre->update($request->validated());
+        });
 
         return redirect()
             ->route('genres.index')
@@ -128,7 +137,9 @@ class GenreController extends Controller
                 );
         }
 
-        $genre->delete();
+        DB::transaction(function () use ($genre): void {
+            $genre->delete();
+        });
 
         return redirect()
             ->route('genres.index')
