@@ -18,7 +18,7 @@ class GenreValidationTest extends TestCase
         $this->post(route('genres.store'), [])
             ->assertRedirect(route('genres.create'))
             ->assertSessionHasErrors([
-                'name' => 'ジャンル名を入力してください。',
+                'name' => 'ジャンル名は必須です。',
             ]);
 
         $this->assertDatabaseCount('genres', 0);
@@ -48,7 +48,7 @@ class GenreValidationTest extends TestCase
         ])
             ->assertRedirect(route('genres.create'))
             ->assertSessionHasErrors([
-                'name' => 'ジャンル名は255文字以下で入力してください。',
+                'name' => 'ジャンル名は255文字以内で入力してください。',
             ]);
 
         $this->assertDatabaseCount('genres', 0);
@@ -65,7 +65,7 @@ class GenreValidationTest extends TestCase
         ])
             ->assertRedirect(route('genres.create'))
             ->assertSessionHasErrors([
-                'name' => 'このジャンル名は既に登録されています。',
+                'name' => 'そのジャンル名は既に使用されています。',
             ])
             ->assertSessionHasInput('name', '技術書');
 
@@ -84,7 +84,7 @@ class GenreValidationTest extends TestCase
         ])
             ->assertRedirect(route('genres.edit', $genre))
             ->assertSessionHasErrors([
-                'name' => 'このジャンル名は既に登録されています。',
+                'name' => 'そのジャンル名は既に使用されています。',
             ])
             ->assertSessionHasInput('name', '文学');
 
@@ -106,7 +106,7 @@ class GenreValidationTest extends TestCase
         ])
             ->assertRedirect(route('genres.edit', $genre))
             ->assertSessionHasErrors([
-                'name' => 'ジャンル名は255文字以下で入力してください。',
+                'name' => 'ジャンル名は255文字以内で入力してください。',
             ])
             ->assertSessionHasInput('name', $invalidName);
 

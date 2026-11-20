@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Genre;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class StoreGenreRequest extends FormRequest
@@ -42,10 +44,10 @@ class StoreGenreRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'ジャンル名を入力してください。',
+            'name.required' => 'ジャンル名は必須です。',
             'name.string' => 'ジャンル名は文字列で入力してください。',
-            'name.max' => 'ジャンル名は255文字以下で入力してください。',
-            'name.unique' => 'このジャンル名は既に登録されています。',
+            'name.max' => 'ジャンル名は255文字以内で入力してください。',
+            'name.unique' => 'そのジャンル名は既に使用されています。',
         ];
     }
 
@@ -55,5 +57,28 @@ class StoreGenreRequest extends FormRequest
     protected function getRedirectUrl(): string
     {
         return route('genres.create');
+    }
+
+    /**
+     * 入力エラーと、提供Bladeで表示できる旧入力を返す。
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+
+        $name = $this->input('name');
+
+        $oldInput = [
+            'name' => is_string($name) ? $name : '',
+        ];
+
+        $response = redirect()
+            ->to($this->getRedirectUrl())
+            ->withErrors($validator, $this->errorBag)
+            ->withInput($oldInput);
+
+        throw new HttpResponseException($response);
     }
 }

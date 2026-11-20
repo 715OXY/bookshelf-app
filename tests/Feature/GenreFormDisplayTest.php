@@ -51,7 +51,7 @@ class GenreFormDisplayTest extends TestCase
             $this->get($formUrl)
                 ->assertOk()
                 ->assertSee('value="重複ジャンル"', false)
-                ->assertSeeText('このジャンル名は既に登録されています。');
+                ->assertSeeText('そのジャンル名は既に使用されています。');
         }
 
         $this->assertDatabaseHas('genres', [

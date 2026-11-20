@@ -103,7 +103,14 @@ class RegisterRequest extends FormRequest
             redirect()
                 ->route('register')
                 ->withErrors($validator)
-                ->withInput($this->only('name', 'email'))
+                ->withInput([
+                    'name' => is_string($this->input('name'))
+                        ? $this->input('name')
+                        : '',
+                    'email' => is_string($this->input('email'))
+                        ? $this->input('email')
+                        : '',
+                ])
         );
     }
 }

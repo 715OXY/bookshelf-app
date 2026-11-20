@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Book;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class StoreBookRequest extends FormRequest
@@ -71,38 +73,38 @@ class StoreBookRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required' => 'タイトルを入力してください。',
+            'title.required' => 'タイトルは必須です。',
             'title.string' => 'タイトルは文字列で入力してください。',
-            'title.max' => 'タイトルは255文字以下で入力してください。',
+            'title.max' => 'タイトルは255文字以内で入力してください。',
 
-            'author.required' => '著者を入力してください。',
+            'author.required' => '著者は必須です。',
             'author.string' => '著者は文字列で入力してください。',
-            'author.max' => '著者は255文字以下で入力してください。',
+            'author.max' => '著者は255文字以内で入力してください。',
 
-            'isbn.required' => 'ISBNを入力してください。',
+            'isbn.required' => 'ISBNは必須です。',
             'isbn.string' => 'ISBNは文字列で入力してください。',
             'isbn.regex' => 'ISBNは半角数字13桁で入力してください。',
-            'isbn.unique' => 'このISBNは既に登録されています。',
+            'isbn.unique' => 'そのISBNは既に使用されています。',
 
-            'published_date.required' => '出版日を入力してください。',
+            'published_date.required' => '出版日は必須です。',
             'published_date.string' => '出版日は文字列で入力してください。',
-            'published_date.date_format' => '出版日は有効な日付をYYYY-MM-DD形式で入力してください。',
+            'published_date.date_format' => '出版日は有効な日付形式で入力してください。',
 
             'description.string' => '説明は文字列で入力してください。',
-            'description.max' => '説明は10,000文字以下で入力してください。',
+            'description.max' => '説明は10,000文字以内で入力してください。',
 
             'image_url.string' => '画像URLは文字列で入力してください。',
-            'image_url.max' => '画像URLは2,048文字以下で入力してください。',
+            'image_url.max' => '画像URLは2,048文字以内で入力してください。',
             'image_url.url' => '画像URLは有効なURL形式で入力してください。',
 
             'genres.required' => 'ジャンルを1つ以上選択してください。',
-            'genres.array' => 'ジャンルの選択形式が正しくありません。',
+            'genres.array' => 'ジャンルは配列で入力してください。',
             'genres.min' => 'ジャンルを1つ以上選択してください。',
 
             'genres.*.required' => 'ジャンルを選択してください。',
             'genres.*.integer' => 'ジャンルの選択値が正しくありません。',
             'genres.*.distinct' => '同じジャンルを重複して選択しないでください。',
-            'genres.*.exists' => '選択したジャンルは存在しません。選び直してください。',
+            'genres.*.exists' => '選択したジャンルは存在しません。',
         ];
     }
 
@@ -112,5 +114,45 @@ class StoreBookRequest extends FormRequest
     protected function getRedirectUrl(): string
     {
         return route('books.create');
+    }
+
+    /**
+     * 入力エラーと、提供Bladeで表示できる旧入力を返す。
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+
+        $oldInput = [];
+
+        foreach ([
+            'title',
+            'author',
+            'isbn',
+            'published_date',
+            'description',
+            'image_url',
+        ] as $field) {
+            $value = $this->input($field);
+            $oldInput[$field] = is_string($value) ? $value : '';
+        }
+
+        $genres = $this->input('genres');
+
+        $oldInput['genres'] = is_array($genres)
+            ? array_values(array_filter(
+                $genres,
+                fn ($value): bool => is_string($value) || is_int($value)
+            ))
+            : [];
+
+        $response = redirect()
+            ->to($this->getRedirectUrl())
+            ->withErrors($validator, $this->errorBag)
+            ->withInput($oldInput);
+
+        throw new HttpResponseException($response);
     }
 }

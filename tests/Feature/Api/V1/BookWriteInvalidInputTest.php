@@ -73,11 +73,11 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         return [
             'タイトル上限超過' => [
                 'title', str_repeat('書', 256), 'title',
-                'タイトルは255文字以下で入力してください。',
+                'タイトルは255文字以内で入力してください。',
             ],
             '著者上限超過' => [
                 'author', str_repeat('著', 256), 'author',
-                '著者は255文字以下で入力してください。',
+                '著者は255文字以内で入力してください。',
             ],
             '識別番号12桁' => [
                 'isbn', '978123456789', 'isbn',
@@ -93,17 +93,17 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
             ],
             '出版日不正' => [
                 'published_date', '2026-02-30', 'published_date',
-                '出版日は有効な日付をYYYY-MM-DD形式で入力してください。',
+                '出版日は有効な日付形式で入力してください。',
             ],
             '説明上限超過' => [
                 'description', str_repeat('説', 10001), 'description',
-                '説明は10,000文字以下で入力してください。',
+                '説明は10,000文字以内で入力してください。',
             ],
             '画像URL上限超過' => [
                 'image_url',
                 'https://example.com/'.str_repeat('a', 2029),
                 'image_url',
-                '画像URLは2,048文字以下で入力してください。',
+                '画像URLは2,048文字以内で入力してください。',
             ],
             '画像URL形式不正' => [
                 'image_url', 'invalid', 'image_url',
@@ -115,11 +115,11 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
             ],
             'ジャンル配列不正' => [
                 'genres', 'invalid', 'genres',
-                'ジャンルの選択形式が正しくありません。',
+                'ジャンルは配列で入力してください。',
             ],
             'ジャンル不存在' => [
                 'genres', [2147483647], 'genres.0',
-                '選択したジャンルは存在しません。選び直してください。',
+                '選択したジャンルは存在しません。',
             ],
         ];
     }

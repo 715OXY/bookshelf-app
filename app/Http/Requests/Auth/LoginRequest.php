@@ -60,7 +60,11 @@ class LoginRequest extends FortifyLoginRequest
             redirect()
                 ->route('login')
                 ->withErrors($validator)
-                ->withInput($this->only('email'))
+                ->withInput([
+                    'email' => is_string($this->input('email'))
+                        ? $this->input('email')
+                        : '',
+                ])
         );
     }
 }

@@ -22,10 +22,10 @@ class BookValidationTest extends TestCase
             ->post(route('books.store'), [])
             ->assertRedirect(route('books.create'))
             ->assertSessionHasErrors([
-                'title' => 'タイトルを入力してください。',
-                'author' => '著者を入力してください。',
-                'isbn' => 'ISBNを入力してください。',
-                'published_date' => '出版日を入力してください。',
+                'title' => 'タイトルは必須です。',
+                'author' => '著者は必須です。',
+                'isbn' => 'ISBNは必須です。',
+                'published_date' => '出版日は必須です。',
                 'genres' => 'ジャンルを1つ以上選択してください。',
             ]);
 
@@ -68,13 +68,13 @@ class BookValidationTest extends TestCase
                 'title',
                 str_repeat('あ', 256),
                 'title',
-                'タイトルは255文字以下で入力してください。',
+                'タイトルは255文字以内で入力してください。',
             ],
             '著者が256文字' => [
                 'author',
                 str_repeat('あ', 256),
                 'author',
-                '著者は255文字以下で入力してください。',
+                '著者は255文字以内で入力してください。',
             ],
             'ISBNが12桁' => [
                 'isbn',
@@ -98,7 +98,7 @@ class BookValidationTest extends TestCase
                 'published_date',
                 '2026-02-30',
                 'published_date',
-                '出版日は有効な日付をYYYY-MM-DD形式で入力してください。',
+                '出版日は有効な日付形式で入力してください。',
             ],
             '説明が配列' => [
                 'description',
@@ -110,7 +110,13 @@ class BookValidationTest extends TestCase
                 'description',
                 str_repeat('あ', 10001),
                 'description',
-                '説明は10,000文字以下で入力してください。',
+                '説明は10,000文字以内で入力してください。',
+            ],
+            '画像URLが2049文字' => [
+                'image_url',
+                'https://example.com/'.str_repeat('a', 2029),
+                'image_url',
+                '画像URLは2,048文字以内で入力してください。',
             ],
             '画像URLが形式不正' => [
                 'image_url',
@@ -128,7 +134,7 @@ class BookValidationTest extends TestCase
                 'genres',
                 'invalid',
                 'genres',
-                'ジャンルの選択形式が正しくありません。',
+                'ジャンルは配列で入力してください。',
             ],
             'ジャンルIDが整数でない' => [
                 'genres',
@@ -140,7 +146,7 @@ class BookValidationTest extends TestCase
                 'genres',
                 [2147483647],
                 'genres.0',
-                '選択したジャンルは存在しません。選び直してください。',
+                '選択したジャンルは存在しません。',
             ],
         ];
     }
@@ -182,7 +188,7 @@ class BookValidationTest extends TestCase
             ->post(route('books.store'), $this->正常入力($genre))
             ->assertRedirect(route('books.create'))
             ->assertSessionHasErrors([
-                'isbn' => 'このISBNは既に登録されています。',
+                'isbn' => 'そのISBNは既に使用されています。',
             ]);
 
         $this->assertDatabaseCount('books', 1);
@@ -214,7 +220,7 @@ class BookValidationTest extends TestCase
             ->put(route('books.update', $book), $payload)
             ->assertRedirect(route('books.edit', $book))
             ->assertSessionHasErrors([
-                'isbn' => 'このISBNは既に登録されています。',
+                'isbn' => 'そのISBNは既に使用されています。',
             ])
             ->assertSessionHasInput('isbn', $otherBook->isbn);
 

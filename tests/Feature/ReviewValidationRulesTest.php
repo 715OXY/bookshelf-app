@@ -25,7 +25,16 @@ class ReviewValidationRulesTest extends TestCase
         foreach ([StoreReviewRequest::class, UpdateReviewRequest::class] as $class) {
             $request = new $class;
 
-            foreach ($cases as $index => $input) {
+            $validCases = $class === UpdateReviewRequest::class
+                ? [
+                    ['rating' => '1', 'comment' => '感想'],
+                    ['rating' => '5', 'comment' => '感想'],
+                    ['rating' => 4, 'comment' => '読みやすい本でした。'],
+                    ['rating' => '5', 'comment' => str_repeat('あ', 10000)],
+                ]
+                : $cases;
+
+            foreach ($validCases as $index => $input) {
                 $validator = Validator::make(
                     $input,
                     $request->rules(),
@@ -46,14 +55,14 @@ class ReviewValidationRulesTest extends TestCase
     public function test_不正入力を拒否し対応する日本語メッセージを返す(): void
     {
         $cases = [
-            [[], 'rating', '評価を選択してください。'],
-            [['rating' => null], 'rating', '評価を選択してください。'],
-            [['rating' => ''], 'rating', '評価を選択してください。'],
+            [[], 'rating', '評価は必須です。'],
+            [['rating' => null], 'rating', '評価は必須です。'],
+            [['rating' => ''], 'rating', '評価は必須です。'],
             [['rating' => '0'], 'rating', '評価は1〜5で選択してください。'],
             [['rating' => '6'], 'rating', '評価は1〜5で選択してください。'],
-            [['rating' => '1.5'], 'rating', '評価は整数で指定してください。'],
-            [['rating' => 'abc'], 'rating', '評価は整数で指定してください。'],
-            [['rating' => ['5']], 'rating', '評価は整数で指定してください。'],
+            [['rating' => '1.5'], 'rating', '評価は整数で入力してください。'],
+            [['rating' => 'abc'], 'rating', '評価は整数で入力してください。'],
+            [['rating' => ['5']], 'rating', '評価は整数で入力してください。'],
             [
                 ['rating' => '3', 'comment' => ['感想']],
                 'comment',
@@ -67,14 +76,38 @@ class ReviewValidationRulesTest extends TestCase
             [
                 ['rating' => '3', 'comment' => str_repeat('あ', 10001)],
                 'comment',
-                'コメントは10,000文字以下で入力してください。',
+                'コメントは10,000文字以内で入力してください。',
             ],
         ];
 
         foreach ([StoreReviewRequest::class, UpdateReviewRequest::class] as $class) {
             $request = new $class;
 
-            foreach ($cases as $index => [$input, $field, $message]) {
+            $invalidCases = $cases;
+
+            if ($class === UpdateReviewRequest::class) {
+                foreach ([
+                    ['rating' => '5'],
+                    ['rating' => '5', 'comment' => null],
+                    ['rating' => '5', 'comment' => ''],
+                    ['rating' => '5', 'comment' => '   '],
+                ] as $input) {
+                    $invalidCases[] = [
+                        $input,
+                        'comment',
+                        'コメントは必須です。',
+                    ];
+                }
+            }
+
+            foreach ($invalidCases as $index => [$input, $field, $message]) {
+                if (
+                    $class === UpdateReviewRequest::class
+                    && $message === '評価は1〜5で選択してください。'
+                ) {
+                    $message = '評価は1〜5の整数で入力してください。';
+                }
+
                 $validator = Validator::make(
                     $input,
                     $request->rules(),
