@@ -106,12 +106,23 @@ class GenreCrudTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         $genre = Genre::factory()->create();
+        $otherGenre = Genre::factory()->create();
         $book = Book::factory()->create();
+        $book->genres()->attach($otherGenre->id);
 
-        // Controllerの事前チェック後、DELETE直前に紐付きを作る。
-        Genre::deleting(function (Genre $deleting) use ($genre, $book): void {
+        $injected = false;
+
+        // 同一トランザクション内で削除直前の競合を模擬する。
+        Genre::deleting(function (Genre $deleting) use ($genre, $book, &$injected): void {
             if ($deleting->is($genre)) {
                 $book->genres()->attach($genre);
+
+                $this->assertDatabaseHas('book_genres', [
+                    'book_id' => $book->id,
+                    'genre_id' => $genre->id,
+                ]);
+
+                $injected = true;
             }
         });
 
@@ -121,16 +132,27 @@ class GenreCrudTest extends TestCase
             $this->delete(route('genres.destroy', $genre));
             $this->fail('DB外部キー制約による削除失敗を期待しました。');
         } catch (QueryException $e) {
-            // DB制約による失敗を通常の削除拒否と区別する。
+            $this->assertSame('23000', $e->errorInfo[0]);
+            $this->assertSame(1451, (int) $e->errorInfo[1]);
         }
+
+        $this->assertTrue($injected);
 
         $this->assertDatabaseHas('genres', [
             'id' => $genre->id,
         ]);
 
-        $this->assertDatabaseHas('book_genres', [
+        // 模擬的に追加した紐付けもロールバックされる。
+        $this->assertDatabaseMissing('book_genres', [
             'book_id' => $book->id,
             'genre_id' => $genre->id,
         ]);
+
+        $this->assertDatabaseHas('book_genres', [
+            'book_id' => $book->id,
+            'genre_id' => $otherGenre->id,
+        ]);
+
+        $this->assertFalse(session()->has('success'));
     }
 }

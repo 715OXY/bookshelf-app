@@ -71,6 +71,8 @@ class BookController extends Controller
      */
     public function store(StoreBookRequest $request): RedirectResponse
     {
+        $this->authorize('create', Book::class);
+
         $attributes = $request->safe()->except('genres');
         $attributes['user_id'] = $request->user()->id;
         $genreIds = $request->validated('genres');
@@ -128,6 +130,8 @@ class BookController extends Controller
      */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
+        $this->authorize('update', $book);
+
         $attributes = $request->safe()->except(['genres', 'user_id']);
         $genreIds = $request->validated('genres');
 

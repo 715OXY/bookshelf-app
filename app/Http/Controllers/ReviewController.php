@@ -19,6 +19,8 @@ class ReviewController extends Controller
         StoreReviewRequest $request,
         Book $book
     ): RedirectResponse {
+        $this->authorize('create', Review::class);
+
         $attributes = $request->safe()->only(['rating', 'comment']);
         $attributes['user_id'] = $request->user()->id;
         $attributes['book_id'] = $book->id;
@@ -51,6 +53,8 @@ class ReviewController extends Controller
         UpdateReviewRequest $request,
         Review $review
     ): RedirectResponse {
+        $this->authorize('update', $review);
+
         $attributes = $request->safe()->only(['rating', 'comment']);
 
         DB::transaction(function () use ($review, $attributes): void {

@@ -25,7 +25,7 @@ class ReviewLikeSeeder extends Seeder
 
             $userIds = $users
                 ->reject(
-                    fn(User $user): bool => $user->id === $review->user_id
+                    fn (User $user): bool => $user->id === $review->user_id
                 )
                 ->take($likeCount)
                 ->pluck('id')

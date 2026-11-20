@@ -136,6 +136,10 @@ class AuthRedirectTest extends TestCase
     {
         return [
             '外部サイト' => ['https://example.com/_test/protected'],
+            '同一スキームで異なるホスト' => ['http://example.com/_test/protected'],
+            'バックスラッシュ付きURL' => ['http://localhost\\@example.com/_test/protected'],
+            '制御文字付きURL' => ["http://localhost/_test/protected\t"],
+            '無効なポート番号' => ['http://localhost:99999/_test/protected'],
             '異なるスキーム' => ['https://localhost/_test/protected'],
             '異なるポート' => ['http://localhost:8080/_test/protected'],
             'スキーム省略URL' => ['//example.com/_test/protected'],
