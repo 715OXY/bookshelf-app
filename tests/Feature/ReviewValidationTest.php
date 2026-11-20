@@ -55,7 +55,7 @@ class ReviewValidationTest extends TestCase
     }
 
     /**
-     * @dataProvider invalidInputProvider
+     * @dataProvider invalidUpdateInputProvider
      */
     public function test_更新失敗時は編集画面へ戻り入力と既存データを保持する(
         array $input,
@@ -133,7 +133,7 @@ class ReviewValidationTest extends TestCase
             '評価が配列' => [
                 ['rating' => ['5'], 'comment' => '今回の入力'],
                 'rating',
-                '評価は整数で指定してください。',
+                '評価は整数で入力してください。',
                 ['rating' => '', 'comment' => '今回の入力'],
             ],
             'コメントが配列' => [
@@ -145,9 +145,36 @@ class ReviewValidationTest extends TestCase
             '評価未選択でコメントを消去' => [
                 ['comment' => ''],
                 'rating',
-                '評価を選択してください。',
+                '評価は必須です。',
                 ['rating' => '', 'comment' => ''],
             ],
         ];
+    }
+
+    /**
+     * @return array<string, array{array, string, string, array}>
+     */
+    public static function invalidUpdateInputProvider(): array
+    {
+        $cases = self::invalidInputProvider();
+
+        $cases['評価の範囲外'][2] =
+            '評価は1〜5の整数で入力してください。';
+
+        foreach ([
+            'コメント未送信' => ['rating' => '5'],
+            'コメントNULL' => ['rating' => '5', 'comment' => null],
+            'コメント空文字' => ['rating' => '5', 'comment' => ''],
+            'コメント空白のみ' => ['rating' => '5', 'comment' => '   '],
+        ] as $name => $input) {
+            $cases[$name] = [
+                $input,
+                'comment',
+                'コメントは必須です。',
+                ['rating' => '5', 'comment' => ''],
+            ];
+        }
+
+        return $cases;
     }
 }

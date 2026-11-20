@@ -107,7 +107,7 @@ class BookUpdateTest extends BookWriteTestCase
             ->assertJsonPath('message', '入力内容に誤りがあります。')
             ->assertJsonPath(
                 'errors.isbn.0',
-                'このISBNは既に登録されています。'
+                'そのISBNは既に使用されています。'
             );
 
         $this->assertSame($before, $this->bookSnapshot());

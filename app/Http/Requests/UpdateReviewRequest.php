@@ -18,13 +18,32 @@ class UpdateReviewRequest extends StoreReviewRequest
     }
 
     /**
-     * 投稿用と同じ日本語メッセージを使用する。
+     * レビュー編集時はコメントを必須とする。
+     *
+     * @return array<string, array<string>>
+     */
+    public function rules(): array
+    {
+        $rules = parent::rules();
+
+        $rules['comment'] = [
+            'bail', 'required', 'string', 'max:10000',
+        ];
+
+        return $rules;
+    }
+
+    /**
+     * 編集時の個別エラーメッセージを定義する。
      *
      * @return array<string, string>
      */
     public function messages(): array
     {
-        return parent::messages();
+        return array_replace(parent::messages(), [
+            'rating.between' => '評価は1〜5の整数で入力してください。',
+            'comment.required' => 'コメントは必須です。',
+        ]);
     }
 
     /**

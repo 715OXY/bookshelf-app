@@ -20,7 +20,7 @@ class BookWriteConflictTest extends BookWriteTestCase
                 ->assertExactJson([
                     'message' => '入力内容に誤りがあります。',
                     'errors' => [
-                        'isbn' => ['このISBNは既に登録されています。'],
+                        'isbn' => ['そのISBNは既に使用されています。'],
                     ],
                 ]);
         });
@@ -47,7 +47,7 @@ class BookWriteConflictTest extends BookWriteTestCase
                 ->assertExactJson([
                     'message' => '入力内容に誤りがあります。',
                     'errors' => [
-                        'isbn' => ['このISBNは既に登録されています。'],
+                        'isbn' => ['そのISBNは既に使用されています。'],
                     ],
                 ]);
         });
@@ -70,12 +70,44 @@ class BookWriteConflictTest extends BookWriteTestCase
                 ->assertExactJson([
                     'message' => '入力内容に誤りがあります。',
                     'errors' => [
-                        'genres' => ['選択したジャンルは存在しません。選び直してください。'],
+                        'genres' => ['選択したジャンルは存在しません。'],
                     ],
                 ]);
         });
 
         $this->assertSame($before, $this->bookSnapshot());
+    }
+
+    public function test_更新直前のジャンル消失を検出する(): void
+    {
+        $book = Book::factory()->create();
+        $payload = $this->validPayload();
+
+        unset($payload['user_id']);
+
+        $payload['isbn'] = $book->isbn;
+
+        $before = $this->bookSnapshot();
+
+        $this->withBookEvent('updating', function () use ($payload): void {
+            DB::table('genres')
+                ->where('id', $payload['genres'][0])
+                ->delete();
+        }, function () use ($book, $payload): void {
+            $this->put(self::URI.'/'.$book->id, $payload)
+                ->assertUnprocessable()
+                ->assertHeader('Content-Type', 'application/json')
+                ->assertHeaderMissing('Location')
+                ->assertExactJson([
+                    'message' => '入力内容に誤りがあります。',
+                    'errors' => [
+                        'genres' => ['選択したジャンルは存在しません。'],
+                    ],
+                ]);
+        });
+
+        $this->assertSame($before, $this->bookSnapshot());
+        $this->assertGuest('web');
     }
 
     public function test_保存直前の登録者消失を検出する(): void

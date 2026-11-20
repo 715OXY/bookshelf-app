@@ -123,21 +123,34 @@ class ReviewCrudTest extends TestCase
             'comment' => '更新後',
         ]);
 
-        // コメントを消して更新できることも確認する。
+        // コメント未入力の更新を拒否し、既存データを保持する。
+        $before = $review->fresh()->getRawOriginal();
+
+        $this->get(route('books.show', $book))
+            ->assertOk();
+
         $this->put(route('reviews.update', $review), [
-            'rating' => '5',
+            'rating' => '1',
             'comment' => '',
         ])
-            ->assertRedirect(route('books.show', $book))
-            ->assertSessionHasNoErrors();
+            ->assertRedirect(route('reviews.edit', $review))
+            ->assertSessionHasErrors([
+                'comment' => 'コメントは必須です。',
+            ])
+            ->assertSessionMissing('success');
 
         $this->assertDatabaseHas('reviews', [
             'id' => $review->id,
             'user_id' => $user->id,
             'book_id' => $book->id,
             'rating' => 5,
-            'comment' => null,
+            'comment' => '更新後',
         ]);
+
+        $this->assertSame(
+            $before,
+            $review->fresh()->getRawOriginal()
+        );
 
         $likesAfter = DB::table('review_likes')
             ->where('review_id', $review->id)

@@ -104,6 +104,60 @@ class AuthCsrfTest extends TestCase
         $this->assertDatabaseCount('users', 1);
         $this->assertAuthenticatedAs(User::firstOrFail(), 'web');
     }
+
+    public function test_有効な_csr_fトークンでログインできる(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'auth@example.com',
+            'password' => Hash::make('Example123!'),
+            'remember_token' => null,
+        ]);
+
+        $before = $user->fresh()->getRawOriginal();
+
+        $this->withSession([
+            '_token' => 'expected-csrf-token',
+        ])->post('/login', [
+            '_token' => 'expected-csrf-token',
+            'email' => 'auth@example.com',
+            'password' => 'Example123!',
+        ])
+            ->assertRedirect('/')
+            ->assertSessionHasNoErrors();
+
+        $this->assertAuthenticatedAs($user, 'web');
+        $this->assertDatabaseCount('users', 1);
+        $this->assertSame($before, $user->fresh()->getRawOriginal());
+    }
+
+    public function test_有効な_csr_fトークンでログアウトできる(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'web')
+            ->withSession([
+                '_token' => 'expected-csrf-token',
+                'csrf_probe' => 'before-logout',
+            ])
+            ->post('/logout', [
+                '_token' => 'expected-csrf-token',
+            ])
+            ->assertRedirect('/login')
+            ->assertSessionMissing('csrf_probe');
+
+        $this->assertGuest('web');
+        $this->assertNotEmpty(session()->token());
+        $this->assertNotSame(
+            'expected-csrf-token',
+            session()->token()
+        );
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => $user->email,
+        ]);
+    }
 }
 
 class EnforcedAuthCsrfMiddleware extends VerifyCsrfToken

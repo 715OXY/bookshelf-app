@@ -30,7 +30,7 @@ class BookConstraintViolation
             ) === 1
         ) {
             return [
-                'isbn' => ['このISBNは既に登録されています。'],
+                'isbn' => ['そのISBNは既に使用されています。'],
             ];
         }
 
@@ -49,7 +49,7 @@ class BookConstraintViolation
                 'CONSTRAINT `book_genres_genre_id_foreign` FOREIGN KEY'
             )) {
                 return [
-                    'genres' => ['選択したジャンルは存在しません。選び直してください。'],
+                    'genres' => ['選択したジャンルは存在しません。'],
                 ];
             }
         }

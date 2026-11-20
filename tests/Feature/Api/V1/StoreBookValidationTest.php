@@ -86,7 +86,7 @@ class StoreBookValidationTest extends BookValidationTestCase
             ->assertUnprocessable()
             ->assertJsonPath(
                 'errors.isbn.0',
-                'このISBNは既に登録されています。'
+                'そのISBNは既に使用されています。'
             );
 
         $this->assertDatabaseCount('books', 1);

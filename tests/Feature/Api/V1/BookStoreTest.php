@@ -117,7 +117,7 @@ class BookStoreTest extends BookWriteTestCase
             ->assertJsonPath('message', '入力内容に誤りがあります。')
             ->assertJsonPath(
                 'errors.title.0',
-                'タイトルを入力してください。'
+                'タイトルは必須です。'
             );
 
         $this->assertSame($before, $this->bookSnapshot());

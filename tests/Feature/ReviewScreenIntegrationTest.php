@@ -83,7 +83,7 @@ class ReviewScreenIntegrationTest extends TestCase
         ])->assertRedirect(route('reviews.edit', $review))->assertSessionHasErrors('rating');
 
         $response = $this->get(route('reviews.edit', $review))->assertOk();
-        $response->assertSeeText('評価を選択してください。');
+        $response->assertSeeText('評価は必須です。');
         $xpath = $this->XPath($response);
         $this->assertSame('更新エラー後に保持するコメント', $xpath->evaluate('string(//textarea[@name="comment"])'));
         $this->assertSame(0, $xpath->query('//input[@name="rating" and @checked]')->length);
@@ -101,7 +101,7 @@ class ReviewScreenIntegrationTest extends TestCase
         ])->assertRedirect(route('books.show', $book))->assertSessionHasErrors('rating');
 
         $response = $this->get(route('books.show', $book))->assertOk();
-        $response->assertSeeText('評価を選択してください。');
+        $response->assertSeeText('評価は必須です。');
         $xpath = $this->XPath($response);
         $this->assertSame('投稿エラー後に保持するコメント', $xpath->evaluate('string(//textarea[@name="comment"])'));
         $this->assertSame('', $xpath->evaluate('string(//select[@name="rating"]/option[@selected]/@value)'));
@@ -165,7 +165,7 @@ class ReviewScreenIntegrationTest extends TestCase
         $posted = $this->get($detailUrl)->assertOk()
             ->assertSeeText('レビューを投稿しました。')
             ->assertSeeText('正常に投稿したコメント')
-            ->assertDontSeeText('評価を選択してください。')
+            ->assertDontSeeText('評価は必須です。')
             ->assertDontSeeText('エラー時に保持するコメント');
 
         $xpath = $this->XPath($posted);
@@ -261,7 +261,7 @@ class ReviewScreenIntegrationTest extends TestCase
             ->assertSessionHasErrors('rating');
 
         $retry = $this->get(route('reviews.edit', $review))->assertOk();
-        $retry->assertSeeText('評価を選択してください。')
+        $retry->assertSeeText('評価は必須です。')
             ->assertSee(e($retryComment), false)
             ->assertDontSee($retryComment, false);
 
@@ -316,7 +316,7 @@ class ReviewScreenIntegrationTest extends TestCase
             : route('reviews.edit', $review);
 
         $message = $invalidField === 'rating'
-            ? '評価は整数で指定してください。'
+            ? '評価は整数で入力してください。'
             : 'コメントは文字列で入力してください。';
 
         $this->from($returnUrl)
