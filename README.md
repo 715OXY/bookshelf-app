@@ -88,6 +88,25 @@ PM確認事項、応用機能、実際の並行競合試験、
 
 新規取得環境でのREADME手順の再現検証は未実施である。
 
+## MS11：応用フェーズ用Bladeテンプレート
+
+2026年11月21日、Issue #60でAdvanced版の
+Bladeテンプレートを導入し、既存機能との互換性を調整した。
+
+- 提供元：`coachtech-prepared-file/Preparedblade-mockcase-BookShelf`
+- 提供ブランチ：`advanced`
+- 提供コミット：`a9c6967`
+- 新規Blade：5ファイル
+- 変更：既存Blade 7ファイル、BookController 1ファイル
+- 未実装の応用機能は、利用可能になるまで表示を制御
+- 全自動テスト：623件PASS、Deprecated 1件、失敗0件
+- 行カバレッジ表示値：93.9%
+
+応用機能のバックエンド処理は未実装。
+暫定的な表示制御、未解決事項、後続の実装条件は
+[MS11 Advanced版Blade導入・引継ぎ記録](docs/ms11-advanced-blade-handover.md)
+を参照する。
+
 ## 設定情報の取り扱い
 
 - `.env`はGit管理せず、設定項目は`.env.example`で共有します。
