@@ -2,10 +2,22 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Book;
 use Illuminate\Validation\Rule;
 
 class UpdateBookRequest extends StoreBookRequest
 {
+    /**
+     * 入力検証より先に、書籍所有者の更新権限を確認する。
+     */
+    public function authorize(): bool
+    {
+        $book = $this->route('book');
+
+        return $book instanceof Book
+            && ($this->user()?->can('update', $book) ?? false);
+    }
+
     /**
      * 書籍更新APIの入力ルール。
      *

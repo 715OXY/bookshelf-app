@@ -70,6 +70,8 @@ class BookController extends Controller
         StoreBookRequest $request,
         BookWriteService $service
     ): JsonResponse {
+        $this->authorize('create', Book::class);
+
         $attributes = $request->safe()->except(['genres', 'user_id']);
         $attributes['user_id'] = $request->user()->getAuthIdentifier();
         $attributes['description'] = $attributes['description'] ?? null;
@@ -93,6 +95,8 @@ class BookController extends Controller
         Book $book,
         BookWriteService $service
     ): JsonResponse {
+        $this->authorize('update', $book);
+
         $attributes = $request->safe()->except(['genres', 'user_id']);
         $attributes['description'] = $attributes['description'] ?? null;
         $attributes['image_url'] = $attributes['image_url'] ?? null;
@@ -115,6 +119,8 @@ class BookController extends Controller
         Book $book,
         BookWriteService $service
     ): Response {
+        $this->authorize('delete', $book);
+
         $service->destroy($book);
 
         return response()->noContent();
