@@ -10,6 +10,9 @@ use Laravel\Fortify\Http\Controllers\RegisteredUserController;
 
 class RegisterController extends Controller
 {
+    /**
+     * 検証済みの会員情報をFortifyへ渡し、永続ログインを無効にして登録する。
+     */
     public function store(
         RegisterRequest $request,
         RegisteredUserController $controller,

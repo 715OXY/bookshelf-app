@@ -8,6 +8,9 @@ use Laravel\Fortify\Http\Requests\LoginRequest as FortifyLoginRequest;
 
 class LoginRequest extends FortifyLoginRequest
 {
+    /**
+     * メールアドレスを正規化し、永続ログインを無効にする。
+     */
     protected function prepareForValidation(): void
     {
         $email = $this->input('email');
@@ -23,6 +26,9 @@ class LoginRequest extends FortifyLoginRequest
         ]);
     }
 
+    /**
+     * ログイン入力のバリデーションルールを返す。
+     */
     public function rules(): array
     {
         return [
@@ -41,6 +47,9 @@ class LoginRequest extends FortifyLoginRequest
         ];
     }
 
+    /**
+     * ログイン入力に対する日本語のエラーメッセージを返す。
+     */
     public function messages(): array
     {
         return [
@@ -54,7 +63,12 @@ class LoginRequest extends FortifyLoginRequest
         ];
     }
 
-    protected function failedValidation(Validator $validator)
+    /**
+     * ログイン入力の検証失敗時に、メールアドレスのみ保持してログイン画面へ戻す。
+     *
+     * @throws HttpResponseException
+     */
+    protected function failedValidation(Validator $validator): void
     {
         throw new HttpResponseException(
             redirect()
