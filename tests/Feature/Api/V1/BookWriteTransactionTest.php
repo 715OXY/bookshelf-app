@@ -48,13 +48,19 @@ class BookWriteTransactionTest extends BookWriteTestCase
             'isbn' => '9781234567892',
         ]);
 
-        if ($method === 'PUT') {
-            unset($payload['user_id']);
-        }
+        // 登録者IDは入力に含めず、認証会員から決定する。
+        unset($payload['user_id']);
 
         if ($method === 'DELETE') {
             $payload = [];
         }
+
+        $issued = $owner->createToken(
+            'issue-69-transaction-test',
+            ['*'],
+            now()->addHour()
+        );
+        $this->withToken($issued->plainTextToken);
 
         $before = $this->bookSnapshot();
 
@@ -84,11 +90,12 @@ class BookWriteTransactionTest extends BookWriteTestCase
         $connection->setEventDispatcher($dispatcher);
 
         try {
-            $response = $this->call(
-                $method,
-                sprintf($path, $book->id),
-                $payload
-            );
+            $uri = sprintf($path, $book->id);
+            $response = match ($method) {
+                'POST' => $this->post($uri, $payload),
+                'PUT' => $this->put($uri, $payload),
+                'DELETE' => $this->delete($uri),
+            };
         } finally {
             $connection->setEventDispatcher($originalDispatcher);
         }
@@ -107,7 +114,7 @@ class BookWriteTransactionTest extends BookWriteTestCase
             ])
             ->assertDontSee('API_TRANSACTION_TEST_INTERNAL_SECRET');
 
-        $this->assertGuest();
+        $this->assertGuest('web');
         $this->assertSame($before, $this->bookSnapshot());
     }
 

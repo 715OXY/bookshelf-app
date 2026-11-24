@@ -35,7 +35,7 @@ abstract class BookValidationTestCase extends TestCase
 
             Route::put(self::URI.'/{book}', function (UpdateBookRequest $request, Book $book): JsonResponse {
                 return response()->json($request->validated());
-            });
+            })->middleware('auth:sanctum');
         });
     }
 
