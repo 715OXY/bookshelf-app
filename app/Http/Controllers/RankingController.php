@@ -17,6 +17,7 @@ class RankingController extends Controller
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->orderByDesc('reviews_avg_rating')
+            ->orderByDesc('created_at')
             ->orderBy('id')
             ->limit(10)
             ->get();
