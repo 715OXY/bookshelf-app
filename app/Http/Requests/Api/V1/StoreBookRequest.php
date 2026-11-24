@@ -14,12 +14,7 @@ class StoreBookRequest extends ApiFormRequest
     public function rules(): array
     {
         return [
-            'user_id' => [
-                'bail',
-                'required',
-                'integer',
-                Rule::exists('users', 'id'),
-            ],
+            'user_id' => ['missing'],
             'title' => ['bail', 'required', 'string', 'max:255'],
             'author' => ['bail', 'required', 'string', 'max:255'],
             'isbn' => [
@@ -67,9 +62,7 @@ class StoreBookRequest extends ApiFormRequest
     public function messages(): array
     {
         return [
-            'user_id.required' => '登録者IDを入力してください。',
-            'user_id.integer' => '登録者IDは整数で入力してください。',
-            'user_id.exists' => '指定された登録者は存在しません。',
+            'user_id.missing' => '登録者IDは指定できません。',
 
             'title.required' => 'タイトルは必須です。',
             'title.string' => 'タイトルは文字列で入力してください。',

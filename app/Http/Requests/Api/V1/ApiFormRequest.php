@@ -9,7 +9,7 @@ use Illuminate\Foundation\Http\FormRequest;
 abstract class ApiFormRequest extends FormRequest
 {
     /**
-     * 基本APIの未認証利用を許可する。
+     * 共通基底では個別の認可条件を追加しない。書き込みの認証はルートで適用する。
      */
     public function authorize(): bool
     {
