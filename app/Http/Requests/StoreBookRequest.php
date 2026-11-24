@@ -125,19 +125,18 @@ class StoreBookRequest extends FormRequest
             parent::failedValidation($validator);
         }
 
-        $oldInput = [];
-
-        foreach ([
+        $oldInput = collect([
             'title',
             'author',
             'isbn',
             'published_date',
             'description',
             'image_url',
-        ] as $field) {
+        ])->mapWithKeys(function (string $field): array {
             $value = $this->input($field);
-            $oldInput[$field] = is_string($value) ? $value : '';
-        }
+
+            return [$field => is_string($value) ? $value : ''];
+        })->all();
 
         $genres = $this->input('genres');
 

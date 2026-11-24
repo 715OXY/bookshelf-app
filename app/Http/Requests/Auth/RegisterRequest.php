@@ -9,11 +9,17 @@ use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
+    /**
+     * 未認証ユーザーによる会員登録を許可する。
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * 会員名とメールアドレスを登録前に正規化する。
+     */
     protected function prepareForValidation(): void
     {
         $name = $this->input('name');
@@ -36,6 +42,9 @@ class RegisterRequest extends FormRequest
         }
     }
 
+    /**
+     * 会員登録入力のバリデーションルールを返す。
+     */
     public function rules(): array
     {
         return [
@@ -71,6 +80,9 @@ class RegisterRequest extends FormRequest
         ];
     }
 
+    /**
+     * 会員登録入力に対する日本語のエラーメッセージを返す。
+     */
     public function messages(): array
     {
         return [
@@ -97,7 +109,12 @@ class RegisterRequest extends FormRequest
         ];
     }
 
-    protected function failedValidation(Validator $validator)
+    /**
+     * 会員登録の検証失敗時に、名前とメールアドレスのみ保持して登録画面へ戻す。
+     *
+     * @throws HttpResponseException
+     */
+    protected function failedValidation(Validator $validator): void
     {
         throw new HttpResponseException(
             redirect()

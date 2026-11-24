@@ -113,11 +113,12 @@ class BookSeeder extends Seeder
         foreach ($books as $index => $data) {
             [$title, $author, $isbn, $publishedDate, $description, $genreNames] = $data;
 
-            $genreIds = [];
-
-            foreach ($genreNames as $name) {
-                $genreIds[] = Genre::where('name', $name)->firstOrFail()->id;
-            }
+            $genreIds = collect($genreNames)
+                ->map(
+                    fn (string $name): int => Genre::where('name', $name)
+                        ->firstOrFail()->id
+                )
+                ->all();
 
             $number = $index + 1;
 
