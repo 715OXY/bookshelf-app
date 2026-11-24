@@ -26,12 +26,14 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::get('/books/{book}', [BookController::class, 'show'])
         ->name('books.show');
 
-    Route::post('/books', [BookController::class, 'store'])
-        ->name('books.store');
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/books', [BookController::class, 'store'])
+            ->name('books.store');
 
-    Route::put('/books/{book}', [BookController::class, 'update'])
-        ->name('books.update');
+        Route::put('/books/{book}', [BookController::class, 'update'])
+            ->name('books.update');
 
-    Route::delete('/books/{book}', [BookController::class, 'destroy'])
-        ->name('books.destroy');
+        Route::delete('/books/{book}', [BookController::class, 'destroy'])
+            ->name('books.destroy');
+    });
 });
