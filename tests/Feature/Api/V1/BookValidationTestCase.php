@@ -7,7 +7,6 @@ use App\Http\Requests\Api\V1\StoreBookRequest;
 use App\Http\Requests\Api\V1\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +23,7 @@ abstract class BookValidationTestCase extends TestCase
     {
         parent::setUp();
 
+        // 入力検証専用ルート。正式APIの認証・保存処理は別テストで検証する。
         Route::middleware('api')->group(function (): void {
             Route::get(self::URI, function (IndexBookRequest $request): JsonResponse {
                 return response()->json($request->validated());
@@ -47,7 +47,6 @@ abstract class BookValidationTestCase extends TestCase
     protected function validPayload(): array
     {
         return [
-            'user_id' => User::factory()->create()->id,
             'title' => 'API入力検証用の書籍',
             'author' => 'テスト著者',
             'isbn' => '9781234567890',

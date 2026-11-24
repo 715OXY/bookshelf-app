@@ -7,7 +7,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 class StoreBookValidationTest extends BookValidationTestCase
 {
-    public function test_未認証で正常な書籍登録入力を受け付ける(): void
+    public function test_入力検証専用ルートで登録者指定なしの正常入力を受け付ける(): void
     {
         $payload = $this->validPayload();
 
@@ -24,13 +24,13 @@ class StoreBookValidationTest extends BookValidationTestCase
         $this->postJson(self::URI, [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'user_id',
                 'title',
                 'author',
                 'isbn',
                 'published_date',
                 'genres',
-            ]);
+            ])
+            ->assertJsonMissingPath('errors.user_id');
 
         $this->assertDatabaseCount('books', 0);
     }
@@ -55,8 +55,11 @@ class StoreBookValidationTest extends BookValidationTestCase
     public static function invalidStoreInputs(): array
     {
         return [
-            '登録者IDの型不正' => ['user_id', 'invalid', 'user_id'],
-            '登録者不存在' => ['user_id', 2147483647, 'user_id'],
+            '登録者IDの文字列指定' => ['user_id', 'invalid', 'user_id'],
+            '登録者IDの整数指定' => ['user_id', 2147483647, 'user_id'],
+            '登録者IDのNULL指定' => ['user_id', null, 'user_id'],
+            '登録者IDの空文字指定' => ['user_id', '', 'user_id'],
+            '登録者IDの空配列指定' => ['user_id', [], 'user_id'],
             'タイトルの型不正' => ['title', [], 'title'],
             'タイトル上限超過' => ['title', str_repeat('あ', 256), 'title'],
             '著者上限超過' => ['author', str_repeat('あ', 256), 'author'],

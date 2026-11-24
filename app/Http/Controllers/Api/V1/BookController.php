@@ -70,7 +70,8 @@ class BookController extends Controller
         StoreBookRequest $request,
         BookWriteService $service
     ): JsonResponse {
-        $attributes = $request->safe()->except('genres');
+        $attributes = $request->safe()->except(['genres', 'user_id']);
+        $attributes['user_id'] = $request->user()->getAuthIdentifier();
         $attributes['description'] = $attributes['description'] ?? null;
         $attributes['image_url'] = $attributes['image_url'] ?? null;
 

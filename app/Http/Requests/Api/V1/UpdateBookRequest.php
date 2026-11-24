@@ -37,12 +37,6 @@ class UpdateBookRequest extends StoreBookRequest
     {
         $messages = parent::messages();
 
-        unset(
-            $messages['user_id.required'],
-            $messages['user_id.integer'],
-            $messages['user_id.exists']
-        );
-
         $messages['user_id.missing'] = '登録者IDは変更できません。';
 
         return $messages;
