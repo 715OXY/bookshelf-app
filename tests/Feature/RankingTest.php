@@ -16,6 +16,46 @@ class RankingTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_同平均の書籍は登録日時の新しい順で取得する(): void
+    {
+        $user = User::factory()->create();
+
+        $highest = Book::factory()->create([
+            'created_at' => '2026-10-01 00:00:00',
+        ]);
+        $older = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
+        $newer = Book::factory()->create([
+            'created_at' => '2026-11-20 00:00:00',
+        ]);
+        $lower = Book::factory()->create([
+            'created_at' => '2026-11-24 00:00:00',
+        ]);
+
+        foreach ([
+            [$highest, 5],
+            [$older, 4],
+            [$newer, 4],
+            [$lower, 3],
+        ] as [$book, $rating]) {
+            Review::factory()->create([
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+                'rating' => $rating,
+            ]);
+        }
+
+        $rankedBooks = app(RankingController::class)
+            ->index()
+            ->getData()['rankedBooks'];
+
+        $this->assertSame(
+            [$highest->id, $newer->id, $older->id, $lower->id],
+            $rankedBooks->pluck('id')->all()
+        );
+    }
+
     public function test_レビュー0件ではランキングが空になる(): void
     {
         Book::factory()->count(3)->create();
@@ -30,15 +70,25 @@ class RankingTest extends TestCase
         $this->assertTrue($rankedBooks->isEmpty());
     }
 
-    public function test_レビューあり書籍を平均評価降順かつ同平均時はid昇順で取得する(): void
+    public function test_レビューあり書籍を平均評価降順かつ同平均同日時はid昇順で取得する(): void
     {
         $user = User::factory()->create();
 
-        $highest = Book::factory()->create();
-        $tieFirst = Book::factory()->create();
-        $tieSecond = Book::factory()->create();
-        $lower = Book::factory()->create();
-        $withoutReview = Book::factory()->create();
+        $highest = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
+        $tieFirst = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
+        $tieSecond = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
+        $lower = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
+        $withoutReview = Book::factory()->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
 
         Review::factory()->create([
             'user_id' => $user->id,
@@ -95,7 +145,9 @@ class RankingTest extends TestCase
     public function test_ランキングは最大10冊まで取得する(): void
     {
         $user = User::factory()->create();
-        $books = Book::factory()->count(11)->create();
+        $books = Book::factory()->count(11)->create([
+            'created_at' => '2026-11-01 00:00:00',
+        ]);
 
         foreach ($books as $book) {
             Review::factory()->create([

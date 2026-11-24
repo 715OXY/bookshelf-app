@@ -93,4 +93,14 @@ Laravel Pint・個別差分・自動テストを併用して確認した。
 機能仕様の変更は意図していない。
 変更前後の全自動テスト結果は一致している。
 
-コミットID、PR番号、マージ結果は作業完了時に確定する。
+Issue #61の確定情報：
+- 実装コミット：c77771817c48f5e662ec2551f7e33854a4547f17
+- PR：#65（Merged）
+- マージコミット：474baed4799752f66d5c443162374c2ba90dc5eb
+
+2026-11-24、Issue #62で既知警告の全文を再確認した。
+HasApiTokens::createTokenのexpiresAt引数の暗黙的nullable指定に関する警告で、
+発生箇所はvendor/laravel/sanctum/src/HasApiTokens.php:46。未解消。
+
+以降の検証結果・PM回答・保留事項の最新状態は
+[MS11統合検証記録](ms11-integration-verification.md)を参照する。
