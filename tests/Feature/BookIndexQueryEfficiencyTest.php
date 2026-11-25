@@ -18,7 +18,8 @@ class BookIndexQueryEfficiencyTest extends TestCase
     #[DataProvider('閲覧者の認証状態')]
     public function test_書籍数が増えても一覧の取得クエリ数が増えない(
         bool $authenticated,
-        bool $filtered
+        bool $filtered,
+        ?string $sort = null
     ): void {
         $user = User::factory()->create();
 
@@ -44,14 +45,17 @@ class BookIndexQueryEfficiencyTest extends TestCase
             }
 
             $expectedCount = $additionalCount === 1 ? 1 : 10;
+            $filters = $filtered ? ['keyword' => 'PHP検索', 'genre' => $genres[0]->id] : [];
+
+            if ($sort !== null) {
+                $filters['sort'] = $sort;
+            }
 
             DB::enableQueryLog();
             DB::flushQueryLog();
 
             try {
-                $response = $this->get(route('books.index', $filtered
-                    ? ['keyword' => 'PHP検索', 'genre' => $genres[0]->id]
-                    : []));
+                $response = $this->get(route('books.index', $filters));
 
                 $queries = DB::getQueryLog();
             } finally {
@@ -92,9 +96,10 @@ class BookIndexQueryEfficiencyTest extends TestCase
         }
 
         fwrite(STDOUT, sprintf(
-            "\nBook index SELECT [%s, %s]: 1 book=%d, 10 books=%d\n",
+            "\nBook index SELECT [%s, %s, %s]: 1 book=%d, 10 books=%d\n",
             $authenticated ? 'authenticated' : 'guest',
             $filtered ? 'filtered' : 'unfiltered',
+            $sort ?? 'default',
             $queryCounts[0],
             $queryCounts[1]
         ));
@@ -110,11 +115,23 @@ class BookIndexQueryEfficiencyTest extends TestCase
 
     public static function 閲覧者の認証状態(): array
     {
-        return [
+        $cases = [
             'ゲスト・条件なし' => [false, false],
             '認証済み会員・条件なし' => [true, false],
             'ゲスト・検索とジャンル' => [false, true],
             '認証済み会員・検索とジャンル' => [true, true],
         ];
+
+        foreach ([false, true] as $authenticated) {
+            foreach ([false, true] as $filtered) {
+                foreach (['latest', 'newest', 'oldest', 'title', 'rating'] as $sort) {
+                    $name = ($authenticated ? '会員・' : 'ゲスト・')
+                        .($filtered ? '検索とジャンル・' : '条件なし・').$sort;
+                    $cases[$name] = [$authenticated, $filtered, $sort];
+                }
+            }
+        }
+
+        return $cases;
     }
 }
