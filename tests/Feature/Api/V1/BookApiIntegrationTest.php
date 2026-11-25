@@ -9,9 +9,12 @@ use App\Models\User;
 
 class BookApiIntegrationTest extends BookWriteTestCase
 {
-    public function test_未認証で書籍の登録から削除まで一貫して操作できる(): void
+    public function test_認証会員が書籍の登録から削除まで一貫して操作できる(): void
     {
         $payload = $this->validPayload();
+        $owner = User::factory()->create();
+        $this->authenticateApiUser($owner);
+
         $reader = User::factory()->create();
         $newGenres = Genre::factory()->count(2)->create();
 
@@ -54,13 +57,12 @@ class BookApiIntegrationTest extends BookWriteTestCase
         ]);
 
         $book->favoritedByUsers()->sync([$reader->id]);
-        $review->likedByUsers()->sync([$payload['user_id']]);
+        $review->likedByUsers()->sync([$owner->id]);
 
         $beforeUpdate = $this->bookSnapshot();
 
         // 書籍情報とジャンルを更新する。
         $updated = $payload;
-        unset($updated['user_id']);
 
         $updated['title'] = '統合テストによる更新後の書籍';
         $updated['isbn'] = '9781234567892';
@@ -101,7 +103,7 @@ class BookApiIntegrationTest extends BookWriteTestCase
 
         $this->assertDatabaseHas('books', [
             'id' => $bookId,
-            'user_id' => $payload['user_id'],
+            'user_id' => $owner->id,
             'isbn' => $updated['isbn'],
         ]);
 
@@ -140,7 +142,7 @@ class BookApiIntegrationTest extends BookWriteTestCase
             'id' => $otherBook->id,
         ]);
 
-        $this->assertGuest();
+        $this->assertGuest('web');
         $this->assertSame($before, $this->bookSnapshot());
     }
 }

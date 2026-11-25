@@ -18,9 +18,9 @@ Laravelを用いて、書籍レビューアプリケーションを開発しま�
 > 以下のAPI説明には基本版の仕様・検証履歴を含む。
 > Issue #68で登録者を認証会員から設定し、POST・PUTのuser_id指定を拒否する仕様へ変更した。Issue #69で所有者だけが更新・削除できる認可を接続した。
 > 書き込みを未認証で利用できる説明は過去段階の仕様。
-> [認証記録](docs/ms12-token-authentication.md)・[登録者入力検証記録](docs/ms12-owner-input-verification.md)・[認可検証記録](docs/ms12-api-authorization-verification.md)を参照。全体統合検証はIssue #70で行う。
+> [認証記録](docs/ms12-token-authentication.md)・[登録者入力検証記録](docs/ms12-owner-input-verification.md)・[認可検証記録](docs/ms12-api-authorization-verification.md)を参照。Issue #70でAPI244件・全体678件の統合検証を実施。既知の非推奨警告1件は継続管理する。
 
-2026年11月24日時点の実装・検証状況。
+2026年11月25日時点の実装・検証状況。
 
 | 区分 | 機能 | 状態 |
 |---|---|---|
@@ -31,7 +31,7 @@ Laravelを用いて、書籍レビューアプリケーションを開発しま�
 | お気に入り | お気に入り登録・解除・一覧表示 | 実装済み |
 | ランキング | 書籍ランキング表示 | 実装済み |
 | 公開API | 書籍一覧・詳細・登録・更新・削除 | 実装・動作検証済み |
-| 応用API | Sanctum認証・所有者認可 | Bearer認証・登録者自動設定・外部user_id指定拒否・所有者認可を実装し対象検証済み。全体統合検証は未実施 |
+| 応用API | Sanctum認証・所有者認可 | 認証・登録者自動設定・所有者認可を実装し、API244件・全体回帰を検証済み。既知の非推奨警告1件あり |
 | 応用機能 | Web書籍検索・ISBN検索・読書統計・読書計画・通知など | 未実装 |
 
 各機能の仕様・実装範囲は、要件シートと個別のヒアリング結果に従います。
@@ -563,11 +563,12 @@ Migration適用済みで、ユーザー・業務データが空の場合は次�
 
 ベースURL：`http://localhost/api/v1`
 
-基本版（MS9）では、以下の5操作に認証を要求しない。
-応用機能の実装工程では、書き込み操作にSanctum認証と必要な認可を追加する。
+現在の応用版ではGETの一覧・詳細を公開し、
+POST・PUT・DELETEにSanctumのBearerトークン認証を要求する。
+登録者は認証会員から設定し、更新・削除は書籍所有者だけに許可する。
+WebセッションだけではAPIへ書き込めない。
 
-基本版の未認証書き込みは課題の検証用仕様であり、
-外部公開環境での運用を想定したものではない。
+基本版（MS9）の未認証CRUDは過去段階の仕様である。
 
 | Method | Endpoint | 内容 | 成功時 |
 |---|---|---|---|
@@ -597,7 +598,7 @@ Migration適用済みで、ユーザー・業務データが空の場合は次�
 
 | 項目 | POST | PUT | 入力条件 |
 |---|---|---|---|
-| user_id | 必須 | 指定不可 | 存在するユーザーID |
+| user_id | 指定不可 | 指定不可 | NULL・空文字・空配列を含め、指定自体を拒否 |
 | title | 必須 | 必須 | 255文字以下 |
 | author | 必須 | 必須 | 255文字以下 |
 | isbn | 必須 | 必須 | 半角数字13桁、一意 |
@@ -636,7 +637,6 @@ curl -i 'http://localhost/api/v1/books/1'
 
 ```json
 {
-    "user_id": 2,
     "title": "API検証用書籍",
     "author": "検証用著者",
     "isbn": "9780000000047",
@@ -647,17 +647,26 @@ curl -i 'http://localhost/api/v1/books/1'
 }
 ```
 
+書き込みではAuthorizationヘッダーにBearerトークンを設定する。
 POST・PUTでJSONを送信する場合はContent-Typeをapplication/jsonとする。
-PUTではuser_idを送信しない。
+POST・PUTともuser_idを送信しない。登録者は認証会員から自動設定される。
+
+    Authorization: Bearer <発行したトークン>
+
+トークンの実値をGit・共有ログ・検証資料へ記載しない。
+再現可能な検証用トークンの発行・失効方法は
+[認証検証記録](docs/ms12-token-authentication.md)を参照する。
 
 書き込み操作を試す場合は、開発用DBであることを確認し、
-実在するユーザー・ジャンルIDと未使用のISBNを指定する。
+検証用会員のトークン・実在するジャンルID・未使用のISBNを使用する。
 既存データを無断で更新・削除しない。
 
 ### エラー応答
 
 | HTTP Status | 内容 |
 |---|---|
+| 401 | 書き込みのBearerトークンがない・無効・失効済み・期限切れ |
+| 403 | 書籍所有者以外による更新・削除 |
 | 404 | 対象書籍またはAPIが存在しない |
 | 405 | 許可されていないHTTPメソッド |
 | 422 | 入力検証エラー |
@@ -680,7 +689,9 @@ PUTではuser_idを送信しない。
 - APIの対象エラーはAcceptヘッダーを明示しない場合もJSONで返す。
 - リクエスト回数制限は原則60回/分。
 - 削除成功時の204レスポンスには本文を含めない。
-- 401・403の認証・認可検証は応用API実装時に行う。
+- 書き込みは認証を先に確認し、未認証なら対象の有無にかかわらず401となる。
+- 有効な認証情報で対象不存在なら404、非所有者なら入力不備より先に403となる。
+- 所有者の入力不備は422となり、拒否時は書籍・関連データを変更しない。
 
 上記の詳細仕様には開発側の実装案を含む。
 PM確認事項と例外処理の保証範囲についてはAPI詳細設計を参照する。
@@ -693,10 +704,18 @@ PM確認事項と例外処理の保証範囲についてはAPI詳細設計を参
 ./vendor/bin/sail artisan test tests/Feature/DatabaseConnectionTest.php
 ./vendor/bin/sail artisan test tests/Feature/Api/V1
 ./vendor/bin/sail artisan test
-./vendor/bin/sail pint --test tests/Feature/Api/V1
+./vendor/bin/sail bin pint --test tests/Feature/Api/V1
 ```
 
-2026年11月19日のIssue #46検証結果：
+2026年11月25日のIssue #70統合検証結果：
+
+- API：244件・2958 assertions成功。
+- 全体：678件・7738 assertions。失敗・エラーなし、非推奨警告1件。
+- 全体Pint：211ファイル成功。
+- 行カバレッジ：94.36%（1070/1134）。
+- 現在実装済みの範囲の結果であり、未実装の応用機能の検証完了ではない。
+
+以下は2026年11月19日のIssue #46検証履歴：
 
 | 対象 | テスト件数 | assertions |
 |---|---:|---:|
@@ -729,6 +748,7 @@ PM確認事項と例外処理の保証範囲についてはAPI詳細設計を参
 - [ジャンル管理](docs/genre-management.md)
 - [MS8統合検証記録](docs/ms8-verification.md)
 - [公開API詳細設計](docs/api-design.md)
+- [MS12 API認証・統合検証記録](docs/ms12-integration-verification.md)
 - [MS9統合検証記録](docs/ms9-verification.md)
 - [基本DB設計・ER図](docs/database-design.md)
 - [MS10テスト環境・基準検証記録](docs/ms10-test-environment.md)

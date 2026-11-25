@@ -30,7 +30,6 @@ class BookApiAuthorizationTest extends BookWriteTestCase
         $review->likedByUsers()->sync([$owner->id]);
 
         $payload = $this->validPayload();
-        unset($payload['user_id']);
         $payload['isbn'] = $book->isbn;
 
         if ($invalid) {

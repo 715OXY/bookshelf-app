@@ -16,12 +16,11 @@ class BookWriteInputTypeTest extends BookWriteTestCase
     ): void {
         $payload = $this->validPayload();
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
         $url = self::URI;
 
         if ($method === 'PUT') {
             $url .= '/'.$book->id;
-
-            unset($payload['user_id']);
 
             $payload['isbn'] = $book->isbn;
         }
@@ -39,7 +38,12 @@ class BookWriteInputTypeTest extends BookWriteTestCase
 
         $this->assertGuest('web');
 
-        $this->call($method, $url, $payload)
+        $response = match ($method) {
+            'POST' => $this->post($url, $payload),
+            'PUT' => $this->put($url, $payload),
+        };
+
+        $response
             ->assertUnprocessable()
             ->assertHeader('Content-Type', 'application/json')
             ->assertHeaderMissing('Location')
@@ -97,13 +101,13 @@ class BookWriteInputTypeTest extends BookWriteTestCase
         ];
 
         $cases = [
-            'POST 登録者IDの型不正' => [
+            'POST 登録者IDの文字列指定' => [
                 'POST', 'user_id', 'invalid',
-                ['user_id' => ['登録者IDは整数で入力してください。']],
+                ['user_id' => ['登録者IDは指定できません。']],
             ],
-            'POST 登録者IDの不存在' => [
+            'POST 登録者IDの整数指定' => [
                 'POST', 'user_id', 2147483647,
-                ['user_id' => ['指定された登録者は存在しません。']],
+                ['user_id' => ['登録者IDは指定できません。']],
             ],
         ];
 

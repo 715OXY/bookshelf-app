@@ -3,10 +3,21 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class BookWriteConflictTest extends BookWriteTestCase
 {
+    protected User $apiUser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->apiUser = User::factory()->create();
+        $this->authenticateApiUser($this->apiUser);
+    }
+
     public function test_登録直前の識別番号重複を検出する(): void
     {
         $payload = $this->validPayload();
@@ -30,10 +41,11 @@ class BookWriteConflictTest extends BookWriteTestCase
 
     public function test_更新直前の識別番号重複を検出する(): void
     {
-        $book = Book::factory()->create();
+        $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
+        ]);
         $otherBook = Book::factory()->create();
         $payload = $this->validPayload();
-        unset($payload['user_id']);
 
         $before = $this->bookSnapshot();
 
@@ -80,10 +92,10 @@ class BookWriteConflictTest extends BookWriteTestCase
 
     public function test_更新直前のジャンル消失を検出する(): void
     {
-        $book = Book::factory()->create();
+        $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
+        ]);
         $payload = $this->validPayload();
-
-        unset($payload['user_id']);
 
         $payload['isbn'] = $book->isbn;
 
@@ -110,14 +122,14 @@ class BookWriteConflictTest extends BookWriteTestCase
         $this->assertGuest('web');
     }
 
-    public function test_保存直前の登録者消失を検出する(): void
+    public function test_保存直前の認証会員消失を検出する(): void
     {
         $payload = $this->validPayload();
         $before = $this->bookSnapshot();
 
-        $this->withBookEvent('creating', function () use ($payload): void {
+        $this->withBookEvent('creating', function (): void {
             DB::table('users')
-                ->where('id', $payload['user_id'])
+                ->where('id', $this->apiUser->id)
                 ->delete();
         }, function () use ($payload): void {
             $this->post(self::URI, $payload)

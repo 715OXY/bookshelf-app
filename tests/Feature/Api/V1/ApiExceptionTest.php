@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 use RuntimeException;
 
 class ApiExceptionTest extends BookWriteTestCase
@@ -20,7 +21,7 @@ class ApiExceptionTest extends BookWriteTestCase
     public function test_存在しない書籍の更新はエラーを返す(): void
     {
         $payload = $this->validPayload();
-        unset($payload['user_id']);
+        $this->authenticateApiUser(User::factory()->create());
 
         $before = $this->bookSnapshot();
 
@@ -36,6 +37,7 @@ class ApiExceptionTest extends BookWriteTestCase
 
     public function test_存在しない書籍の削除はエラーを返す(): void
     {
+        $this->authenticateApiUser(User::factory()->create());
         $before = $this->bookSnapshot();
 
         $this->delete(self::URI.'/0')
@@ -87,6 +89,7 @@ class ApiExceptionTest extends BookWriteTestCase
     public function test_入力不備は項目別のエラーを返す(): void
     {
         $payload = $this->validPayload();
+        $this->authenticateApiUser(User::factory()->create());
         $payload['title'] = '';
 
         $before = $this->bookSnapshot();
@@ -108,6 +111,7 @@ class ApiExceptionTest extends BookWriteTestCase
         config(['app.debug' => $debug]);
 
         $payload = $this->validPayload();
+        $this->authenticateApiUser(User::factory()->create());
         $before = $this->bookSnapshot();
 
         $original = Book::getEventDispatcher();

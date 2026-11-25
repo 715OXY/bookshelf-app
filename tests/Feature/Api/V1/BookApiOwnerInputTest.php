@@ -142,19 +142,6 @@ class BookApiOwnerInputTest extends BookWriteTestCase
     }
 
     /**
-     * 正式APIへ送る正常入力。登録者は入力に含めない。
-     *
-     * @return array<string, mixed>
-     */
-    protected function validPayload(): array
-    {
-        $payload = parent::validPayload();
-        unset($payload['user_id']);
-
-        return $payload;
-    }
-
-    /**
      * @return array<string, array{string, mixed}>
      */
     public static function forbiddenOwnerInputs(): array
