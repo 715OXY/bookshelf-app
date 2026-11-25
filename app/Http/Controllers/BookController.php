@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\BookRegistrationFailedException;
+use App\Http\Requests\IndexBookRequest;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -18,9 +19,14 @@ class BookController extends Controller
     /**
      * 書籍一覧を最新順・10件ずつ表示する。
      */
-    public function index(Request $request): View|RedirectResponse
+    public function index(IndexBookRequest $request): View|RedirectResponse
     {
         $this->authorize('viewAny', Book::class);
+
+        $filters = array_filter(
+            $request->validated(),
+            fn ($value): bool => $value !== null && $value !== ''
+        );
 
         $page = filter_var(
             $request->query('page', 1),
@@ -29,7 +35,7 @@ class BookController extends Controller
         );
 
         if ($page === false) {
-            return redirect()->route('books.index');
+            return redirect()->route('books.index', $filters);
         }
 
         $query = Book::query()
@@ -38,20 +44,40 @@ class BookController extends Controller
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
-        // 大きすぎるページ番号も、検索前に補正する。
+        if (isset($filters['keyword'])) {
+            $pattern = '%'.str_replace(
+                ['!', '%', '_'],
+                ['!!', '!%', '!_'],
+                $filters['keyword']
+            ).'%';
+
+            $query->where(function (Builder $query) use ($pattern): void {
+                $query->whereRaw("title LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("author LIKE ? ESCAPE '!'", [$pattern]);
+            });
+        }
+
+        if (isset($filters['genre'])) {
+            $query->whereHas('genres', function (Builder $query) use ($filters): void {
+                $query->where('genres.id', $filters['genre']);
+            });
+        }
+
+        // 絞り込み後の件数で、巨大OFFSETを発行する前に補正する。
         $total = (clone $query)->count();
         $lastPage = max(1, (int) ceil($total / 10));
 
         if ($page > $lastPage) {
             return redirect()->route(
                 'books.index',
-                $lastPage === 1 ? [] : ['page' => $lastPage]
+                $filters + ($lastPage === 1 ? [] : ['page' => $lastPage])
             );
         }
 
-        $books = $query->paginate(10, ['*'], 'page', $page);
+        $books = $query->paginate(10, ['*'], 'page', $page)->appends($filters);
+        $genres = Genre::query()->orderBy('id')->get();
 
-        return view('books.index', compact('books'));
+        return view('books.index', compact('books', 'genres'));
     }
 
     /**
