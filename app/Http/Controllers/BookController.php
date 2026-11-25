@@ -17,7 +17,7 @@ use Throwable;
 class BookController extends Controller
 {
     /**
-     * 書籍一覧を最新順・10件ずつ表示する。
+     * 検索条件と並び順を適用し、書籍一覧を10件ずつ表示する。
      */
     public function index(IndexBookRequest $request): View|RedirectResponse
     {
@@ -40,9 +40,7 @@ class BookController extends Controller
 
         $query = Book::query()
             ->with('genres')
-            ->withAvg('reviews', 'rating')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->withAvg('reviews', 'rating');
 
         if (isset($filters['keyword'])) {
             $pattern = '%'.str_replace(
@@ -74,7 +72,9 @@ class BookController extends Controller
             );
         }
 
-        $books = $query->paginate(10, ['*'], 'page', $page)->appends($filters);
+        $books = $this->applyIndexSort($query, $request->sortName())
+            ->paginate(10, ['*'], 'page', $page)
+            ->appends($filters);
         $genres = Genre::query()->orderBy('id')->get();
 
         return view('books.index', compact('books', 'genres'));
@@ -182,5 +182,24 @@ class BookController extends Controller
         return redirect()
             ->route('books.index')
             ->with('success', '書籍を削除しました。');
+    }
+
+    /**
+     * 許可済みのソート名から、固定された順序だけを適用する。
+     *
+     * @param  Builder<Book>  $query
+     * @return Builder<Book>
+     */
+    private function applyIndexSort(Builder $query, string $sort): Builder
+    {
+        return match ($sort) {
+            'oldest' => $query->orderBy('created_at')->orderBy('id'),
+            'title' => $query->orderBy('title')->orderByDesc('created_at')->orderByDesc('id'),
+            'rating' => $query->orderByRaw('reviews_avg_rating IS NULL ASC')
+                ->orderByDesc('reviews_avg_rating')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id'),
+            default => $query->orderByDesc('created_at')->orderByDesc('id'),
+        };
     }
 }

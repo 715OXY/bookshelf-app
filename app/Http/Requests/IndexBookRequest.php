@@ -29,6 +29,7 @@ class IndexBookRequest extends FormRequest
         return [
             'keyword' => ['bail', 'nullable', 'string', 'max:255'],
             'genre' => ['bail', 'nullable', 'integer', 'min:1', Rule::exists('genres', 'id')],
+            'sort' => ['bail', 'nullable', 'string', Rule::in(['latest', 'newest', 'oldest', 'title', 'rating'])],
         ];
     }
 
@@ -43,7 +44,22 @@ class IndexBookRequest extends FormRequest
             'genre.integer' => 'ジャンルの選択値が正しくありません。',
             'genre.min' => 'ジャンルの選択値が正しくありません。',
             'genre.exists' => '選択したジャンルは存在しません。',
+            'sort.string' => '並び順の指定が正しくありません。',
+            'sort.in' => '並び順の指定が正しくありません。',
         ];
+    }
+
+    /**
+     * URLへ保持する入力表記は変えず、内部の正式なソート名を返す。
+     */
+    public function sortName(): string
+    {
+        return match ($this->validated('sort')) {
+            'oldest' => 'oldest',
+            'title' => 'title',
+            'rating' => 'rating',
+            default => 'latest',
+        };
     }
 
     /**
