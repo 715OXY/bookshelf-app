@@ -41,7 +41,6 @@ abstract class BookWriteTestCase extends TestCase
     protected function validPayload(): array
     {
         return [
-            'user_id' => User::factory()->create()->id,
             'title' => 'API書込検証用の書籍',
             'author' => 'テスト著者',
             'isbn' => '9781234567890',
@@ -78,5 +77,19 @@ abstract class BookWriteTestCase extends TestCase
         }
 
         return $snapshot;
+    }
+
+    /**
+     * 明示的に指定された会員の実Bearerトークンを設定する。
+     */
+    protected function authenticateApiUser(User $user): void
+    {
+        $issued = $user->createToken(
+            'issue-70-test',
+            ['*'],
+            now()->addHour()
+        );
+
+        $this->withToken($issued->plainTextToken);
     }
 }

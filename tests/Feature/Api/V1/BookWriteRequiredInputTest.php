@@ -16,13 +16,12 @@ class BookWriteRequiredInputTest extends BookWriteTestCase
         $payload = $this->validPayload();
 
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
 
         $url = self::URI;
 
         if ($method === 'PUT') {
             $url .= '/'.$book->id;
-
-            unset($payload['user_id']);
 
             $payload['isbn'] = $book->isbn;
         }
@@ -33,7 +32,12 @@ class BookWriteRequiredInputTest extends BookWriteTestCase
 
         $this->assertGuest('web');
 
-        $this->call($method, $url, $payload)
+        $response = match ($method) {
+            'POST' => $this->post($url, $payload),
+            'PUT' => $this->put($url, $payload),
+        };
+
+        $response
             ->assertUnprocessable()
             ->assertHeader('Content-Type', 'application/json')
             ->assertHeaderMissing('Location')
@@ -62,13 +66,7 @@ class BookWriteRequiredInputTest extends BookWriteTestCase
             'genres' => 'ジャンルを1つ以上選択してください。',
         ];
 
-        $cases = [
-            'POST user_id 未送信' => [
-                'POST',
-                'user_id',
-                '登録者IDを入力してください。',
-            ],
-        ];
+        $cases = [];
 
         foreach (['POST', 'PUT'] as $method) {
             foreach ($messages as $field => $message) {

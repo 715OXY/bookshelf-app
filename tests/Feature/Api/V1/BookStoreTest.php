@@ -3,10 +3,21 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 
 class BookStoreTest extends BookWriteTestCase
 {
-    public function test_未認証で書籍と複数ジャンルを登録できる(): void
+    protected User $apiUser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->apiUser = User::factory()->create();
+        $this->authenticateApiUser($this->apiUser);
+    }
+
+    public function test_認証会員名義で書籍と複数ジャンルを登録できる(): void
     {
         $payload = $this->validPayload();
 
@@ -27,6 +38,7 @@ class BookStoreTest extends BookWriteTestCase
 
         $this->assertDatabaseHas('books', [
             'id' => $response->json('data.id'),
+            'user_id' => $this->apiUser->id,
             ...collect($payload)->except('genres')->all(),
         ]);
 
@@ -41,7 +53,7 @@ class BookStoreTest extends BookWriteTestCase
         );
 
         $this->assertDatabaseCount('book_genres', 2);
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public function test_任意項目を省略すると空値で登録される(): void
@@ -141,6 +153,6 @@ class BookStoreTest extends BookWriteTestCase
             $book->getRawOriginal('created_at')
         );
 
-        $this->assertEquals($payload['user_id'], $book->user_id);
+        $this->assertSame($this->apiUser->id, $book->user_id);
     }
 }

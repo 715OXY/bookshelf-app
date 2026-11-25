@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -15,6 +16,7 @@ class ApiExceptionSafetyTest extends BookWriteTestCase
         config(['app.debug' => true]);
 
         $payload = $this->validPayload();
+        $this->authenticateApiUser(User::factory()->create());
         $before = $this->bookSnapshot();
 
         $original = Book::getEventDispatcher();
@@ -70,6 +72,7 @@ class ApiExceptionSafetyTest extends BookWriteTestCase
     public function test_正規の入力検証エラーは項目別情報を返す(): void
     {
         $payload = $this->validPayload();
+        $this->authenticateApiUser(User::factory()->create());
         $payload['title'] = '';
 
         $before = $this->bookSnapshot();

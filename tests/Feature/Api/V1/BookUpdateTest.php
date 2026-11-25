@@ -5,22 +5,31 @@ namespace Tests\Feature\Api\V1;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Review;
+use App\Models\User;
 
 class BookUpdateTest extends BookWriteTestCase
 {
-    public function test_未認証で書籍とジャンルを更新できる(): void
+    protected User $apiUser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->apiUser = User::factory()->create();
+        $this->authenticateApiUser($this->apiUser);
+    }
+
+    public function test_所有者が書籍とジャンルを更新できる(): void
     {
         $payload = $this->validPayload();
 
         $book = Book::factory()->create([
-            'user_id' => $payload['user_id'],
+            'user_id' => $this->apiUser->id,
             'isbn' => $payload['isbn'],
         ]);
 
         $oldGenre = Genre::factory()->create();
         $book->genres()->sync([$oldGenre->id]);
-
-        unset($payload['user_id']);
 
         $response = $this->put(self::URI.'/'.$book->id, $payload);
 
@@ -59,7 +68,7 @@ class BookUpdateTest extends BookWriteTestCase
 
         $this->assertDatabaseHas('genres', ['id' => $oldGenre->id]);
         $this->assertDatabaseCount('books', 1);
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public function test_任意項目を省略すると空値で更新される(): void
@@ -67,12 +76,12 @@ class BookUpdateTest extends BookWriteTestCase
         $payload = $this->validPayload();
 
         $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
             'description' => '更新前の説明',
             'image_url' => 'https://example.com/old.jpg',
         ]);
 
         unset(
-            $payload['user_id'],
             $payload['description'],
             $payload['image_url']
         );
@@ -92,13 +101,13 @@ class BookUpdateTest extends BookWriteTestCase
     public function test_他の書籍と重複する識別番号では更新しない(): void
     {
         $payload = $this->validPayload();
-        $book = Book::factory()->create();
+        $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
+        ]);
 
         Book::factory()->create([
             'isbn' => $payload['isbn'],
         ]);
-
-        unset($payload['user_id']);
 
         $before = $this->bookSnapshot();
 
@@ -116,7 +125,10 @@ class BookUpdateTest extends BookWriteTestCase
     public function test_登録者を指定すると更新しない(): void
     {
         $payload = $this->validPayload();
-        $book = Book::factory()->create();
+        $payload['user_id'] = $this->apiUser->id;
+        $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
+        ]);
 
         $before = $this->bookSnapshot();
 
@@ -134,15 +146,15 @@ class BookUpdateTest extends BookWriteTestCase
     public function test_更新後も既存レビューと評価情報を保持する(): void
     {
         $payload = $this->validPayload();
-        $book = Book::factory()->create();
+        $book = Book::factory()->create([
+            'user_id' => $this->apiUser->id,
+        ]);
 
         $review = Review::factory()->create([
             'book_id' => $book->id,
             'rating' => 4,
             'comment' => '更新前のレビュー',
         ]);
-
-        unset($payload['user_id']);
 
         $before = $this->bookSnapshot();
 

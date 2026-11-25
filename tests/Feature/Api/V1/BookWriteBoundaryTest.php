@@ -3,12 +3,15 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 
 class BookWriteBoundaryTest extends BookWriteTestCase
 {
     public function test_許容最大文字数で書籍を登録できる(): void
     {
         $payload = $this->boundaryPayload();
+        $owner = User::factory()->create();
+        $this->authenticateApiUser($owner);
 
         $response = $this->post(self::URI, $payload)
             ->assertCreated()
@@ -19,7 +22,7 @@ class BookWriteBoundaryTest extends BookWriteTestCase
 
         $this->assertStoredPayload($book, $payload);
 
-        $this->assertSame($payload['user_id'], $book->user_id);
+        $this->assertSame($owner->id, $book->user_id);
         $this->assertDatabaseCount('books', 1);
         $this->assertDatabaseCount('book_genres', 1);
 
@@ -34,17 +37,17 @@ class BookWriteBoundaryTest extends BookWriteTestCase
             $response->assertJsonPath('data.'.$field, $payload[$field]);
         }
 
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public function test_許容最大文字数で書籍を更新できる(): void
     {
         $payload = $this->boundaryPayload();
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
 
         $ownerId = $book->user_id;
 
-        unset($payload['user_id']);
         $payload['isbn'] = $book->isbn;
 
         $response = $this->put(
@@ -75,7 +78,7 @@ class BookWriteBoundaryTest extends BookWriteTestCase
             $response->assertJsonPath('data.'.$field, $payload[$field]);
         }
 
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     /**

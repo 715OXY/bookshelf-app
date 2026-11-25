@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Book;
+use App\Models\User;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 class BookWriteInvalidInputTest extends BookWriteTestCase
@@ -15,6 +16,7 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         string $message
     ): void {
         $payload = $this->validPayload();
+        $this->authenticateApiUser(User::factory()->create());
         $payload[$field] = $value;
 
         $before = $this->bookSnapshot();
@@ -32,7 +34,7 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         );
 
         $this->assertSame($before, $this->bookSnapshot());
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     #[DataProvider('invalidWriteInputs')]
@@ -43,9 +45,8 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         string $message
     ): void {
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
         $payload = $this->validPayload();
-
-        unset($payload['user_id']);
 
         $payload['isbn'] = $book->isbn;
         $payload[$field] = $value;
@@ -65,7 +66,7 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         );
 
         $this->assertSame($before, $this->bookSnapshot());
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public static function invalidWriteInputs(): array
@@ -129,6 +130,7 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
         mixed $value
     ): void {
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
         $payload = $this->validPayload();
 
         $payload['isbn'] = $book->isbn;
@@ -147,7 +149,7 @@ class BookWriteInvalidInputTest extends BookWriteTestCase
             );
 
         $this->assertSame($before, $this->bookSnapshot());
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public static function forbiddenOwnerValues(): array

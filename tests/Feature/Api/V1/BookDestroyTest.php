@@ -9,9 +9,10 @@ use App\Models\User;
 
 class BookDestroyTest extends BookWriteTestCase
 {
-    public function test_未認証で書籍と関連データを削除できる(): void
+    public function test_所有者が書籍と関連データを削除できる(): void
     {
         $book = $this->createBookWithRelations();
+        $this->authenticateApiUser($book->user);
 
         $review = $book->reviews()->firstOrFail();
 
@@ -44,12 +45,13 @@ class BookDestroyTest extends BookWriteTestCase
             'book_id' => $book->id,
         ]);
 
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public function test_削除対象以外の書籍と関連データを保持する(): void
     {
         $book = $this->createBookWithRelations();
+        $this->authenticateApiUser($book->user);
         $otherBook = $this->createBookWithRelations();
 
         $reviewIds = $book->reviews()->pluck('id')->all();
@@ -86,6 +88,7 @@ class BookDestroyTest extends BookWriteTestCase
     public function test_関連データのない書籍も削除できる(): void
     {
         $book = Book::factory()->create();
+        $this->authenticateApiUser($book->user);
         $book->genres()->detach();
 
         $this->assertDatabaseMissing('book_genres', [

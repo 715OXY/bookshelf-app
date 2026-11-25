@@ -1,13 +1,13 @@
 # マイルストーン10 基本機能テスト要件対応表
 
-> 最新更新：2026-11-20（Issue #56）
+> 最新更新：2026-11-25（Issue #70）
 >
-> 最新の全体検証結果は624件・7175アサーション、
-> 行カバレッジ93.94%、失敗・未完了0件、非推奨警告1件。
-> 現在の対応状況は第14節を参照すること。
-> 第1〜13節はIssue #55までの履歴として保持する。
+> 現在の全体検証結果は678件・7738アサーション、
+> 行カバレッジ94.36%、失敗・エラーなし、非推奨警告1件。
+> API244件の統合検証と現在の要件対応は末尾のIssue #70更新節を参照。
+> 過去の件数・課題・採番は当時の履歴として保持する。
 >
-> 詳細：[MS10最終統合検証記録](ms10-final-verification.md)
+> 詳細：[MS12統合検証記録](ms12-integration-verification.md)
 
 
 ## 1. 対象と根拠
@@ -616,3 +616,34 @@ H070のランキング是正、最新の全体625件の検証結果、
 各回答の適用範囲と未完了事項は
 [MS11統合検証記録](ms11-integration-verification.md)を参照する。
 要件シート原本への転記・提出前の新規環境検証は未完了。
+
+## Issue #70：応用APIの要件対応更新（2026-11-25）
+
+| 要件・確認観点 | 主な対応テスト | 状態 |
+|---|---|---|
+| GET公開・検索・ページング・Resource | BookIndexTest・BookShowTest・BookIndexSearchTest・BookIndexPaginationTest | 検証済み |
+| Bearerなし・無効・失効・期限切れ・Web認証だけの拒否 | BookTokenAuthenticationTest | 実トークンで検証済み |
+| 認証会員からの登録者設定・user_id指定拒否（H072） | BookApiOwnerInputTest・BookStoreTest・BookWriteInputTypeTest | 検証済み |
+| 所有者認可・認可優先・401/403/404（H073） | BookApiAuthorizationTest | 検証済み |
+| 必須・型・境界値・日本語422 | 各ValidationTest・BookWriteRequiredInputTest・BookWriteInputTypeTest・BookWriteInvalidInputTest・BookWriteBoundaryTest | 検証済み |
+| 関連データの保持・削除・CRUD一貫性 | BookUpdateTest・BookDestroyTest・BookApiIntegrationTest | 検証済み |
+| 模擬競合・障害注入到達・ロールバック | BookWriteConflictTest・BookWriteTransactionTest | 検証済み |
+| 内部情報・不適切な例外応答の非公開 | ApiExceptionTest・ApiExceptionSafetyTest・BookWriteExceptionSafetyTest | 検証済み |
+| 取得効率・参照時のデータ保持 | BookQueryEfficiencyTest・BookReadIntegrityTest | 検証済み |
+| Web認証認可を含む全体回帰 | 全体678件・7738アサーション | 失敗・エラーなし、非推奨警告1件 |
+
+API244件・2958アサーション成功。全体Pint211ファイル成功。
+行94.36%、メソッド90.14%、クラス78.57%。
+テスト成功とPMによる設計承認、未実装応用機能の完成は区別する。
+
+H072・H073は実装・対象検証へ反映済み。
+H074・H084・H088の適用済み共通文言を維持した。
+H076〜H079等の未回答事項、H085の認証文言差分、
+H081・H082等の未回答事項は継続管理する。
+H086の「指定なし」はSanctum警告の解消を意味しない。
+H087により実際の並行競合試験・大規模負荷試験は必須に含まれず、
+今回は未実施として記録する。
+
+要件シート原本の更新、新規取得環境でのREADME再現、
+未実装応用機能の検証完了とは扱わない。
+詳細：[MS12統合検証記録](ms12-integration-verification.md)

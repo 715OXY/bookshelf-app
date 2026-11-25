@@ -22,7 +22,8 @@ class BookWriteExceptionSafetyTest extends BookWriteTestCase
 
         $payload = $this->validPayload();
 
-        $owner = User::findOrFail($payload['user_id']);
+        $owner = User::factory()->create();
+        $this->authenticateApiUser($owner);
         $reader = User::factory()->create();
         $oldGenre = Genre::factory()->create();
 
@@ -42,7 +43,6 @@ class BookWriteExceptionSafetyTest extends BookWriteTestCase
 
         Book::factory()->create();
 
-        unset($payload['user_id']);
         $payload['isbn'] = $book->isbn;
 
         if ($method === 'DELETE') {
@@ -103,11 +103,11 @@ class BookWriteExceptionSafetyTest extends BookWriteTestCase
         $connection->setEventDispatcher($dispatcher);
 
         try {
-            $response = $this->call(
-                $method,
-                self::URI.'/'.$book->id,
-                $payload
-            );
+            $uri = self::URI.'/'.$book->id;
+            $response = match ($method) {
+                'PUT' => $this->put($uri, $payload),
+                'DELETE' => $this->delete($uri),
+            };
         } finally {
             $connection->setEventDispatcher($original);
         }
@@ -128,7 +128,7 @@ class BookWriteExceptionSafetyTest extends BookWriteTestCase
             ->assertDontSee('API_UNSAFE_SECRET');
 
         $this->assertSame($before, $this->bookSnapshot());
-        $this->assertGuest();
+        $this->assertGuest('web');
     }
 
     public static function unsafeOperations(): array

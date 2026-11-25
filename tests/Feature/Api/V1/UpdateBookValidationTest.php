@@ -13,8 +13,6 @@ class UpdateBookValidationTest extends BookValidationTestCase
         $this->authenticateBookOwner($book);
         $payload = $this->validPayload();
 
-        unset($payload['user_id']);
-
         $payload['isbn'] = $book->isbn;
 
         $this->putJson(self::URI.'/'.$book->id, $payload)
@@ -30,8 +28,6 @@ class UpdateBookValidationTest extends BookValidationTestCase
         $this->authenticateBookOwner($book);
         $otherBook = Book::factory()->create();
         $payload = $this->validPayload();
-
-        unset($payload['user_id']);
 
         $payload['isbn'] = $otherBook->isbn;
 

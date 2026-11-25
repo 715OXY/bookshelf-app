@@ -23,7 +23,7 @@ class BookWriteTransactionTest extends BookWriteTestCase
 
         $payload = $this->validPayload();
 
-        $owner = User::findOrFail($payload['user_id']);
+        $owner = User::factory()->create();
         $otherUser = User::factory()->create();
         $oldGenre = Genre::factory()->create();
 
@@ -47,9 +47,6 @@ class BookWriteTransactionTest extends BookWriteTestCase
             'user_id' => $otherUser->id,
             'isbn' => '9781234567892',
         ]);
-
-        // 登録者IDは入力に含めず、認証会員から決定する。
-        unset($payload['user_id']);
 
         if ($method === 'DELETE') {
             $payload = [];
