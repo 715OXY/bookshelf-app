@@ -17,7 +17,8 @@ class BookIndexQueryEfficiencyTest extends TestCase
 
     #[DataProvider('閲覧者の認証状態')]
     public function test_書籍数が増えても一覧の取得クエリ数が増えない(
-        bool $authenticated
+        bool $authenticated,
+        bool $filtered
     ): void {
         $user = User::factory()->create();
 
@@ -27,7 +28,7 @@ class BookIndexQueryEfficiencyTest extends TestCase
 
         foreach ([1, 9] as $additionalCount) {
             for ($i = 0; $i < $additionalCount; $i++) {
-                $book = Book::factory()->for($user)->create();
+                $book = Book::factory()->for($user)->create(['title' => 'PHP検索の対象']);
 
                 $book->genres()->sync($genres->modelKeys());
 
@@ -48,7 +49,9 @@ class BookIndexQueryEfficiencyTest extends TestCase
             DB::flushQueryLog();
 
             try {
-                $response = $this->get(route('books.index'));
+                $response = $this->get(route('books.index', $filtered
+                    ? ['keyword' => 'PHP検索', 'genre' => $genres[0]->id]
+                    : []));
 
                 $queries = DB::getQueryLog();
             } finally {
@@ -89,8 +92,9 @@ class BookIndexQueryEfficiencyTest extends TestCase
         }
 
         fwrite(STDOUT, sprintf(
-            "\nBook index SELECT [%s]: 1 book=%d, 10 books=%d\n",
+            "\nBook index SELECT [%s, %s]: 1 book=%d, 10 books=%d\n",
             $authenticated ? 'authenticated' : 'guest',
+            $filtered ? 'filtered' : 'unfiltered',
             $queryCounts[0],
             $queryCounts[1]
         ));
@@ -107,8 +111,10 @@ class BookIndexQueryEfficiencyTest extends TestCase
     public static function 閲覧者の認証状態(): array
     {
         return [
-            'ゲスト' => [false],
-            '認証済み会員' => [true],
+            'ゲスト・条件なし' => [false, false],
+            '認証済み会員・条件なし' => [true, false],
+            'ゲスト・検索とジャンル' => [false, true],
+            '認証済み会員・検索とジャンル' => [true, true],
         ];
     }
 }

@@ -8,7 +8,6 @@ use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\User;
-use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -190,14 +189,8 @@ class BookFoundationTest extends TestCase
 
         // 同一日時の場合はID降順になることも確認する。
         $expectedIds = $books->pluck('id')->sortDesc()->values()->all();
-        $controller = app(BookController::class);
-
-        $view = $controller->index(Request::create('/'));
-
-        $this->assertInstanceOf(View::class, $view);
-        $this->assertSame('books.index', $view->name());
-
-        $page = $view->getData()['books'];
+        $response = $this->get(route('books.index'))->assertOk()->assertViewIs('books.index');
+        $page = $response->viewData('books');
 
         $this->assertSame(11, $page->total());
         $this->assertSame(10, $page->perPage());
@@ -207,11 +200,8 @@ class BookFoundationTest extends TestCase
             $this->assertTrue($book->relationLoaded('genres'));
         }
 
-        $secondView = $controller->index(Request::create('/?page=2'));
-
-        $this->assertInstanceOf(View::class, $secondView);
-
-        $secondPage = $secondView->getData()['books'];
+        $secondPage = $this->get(route('books.index', ['page' => 2]))
+            ->assertOk()->viewData('books');
 
         $this->assertSame(2, $secondPage->currentPage());
         $this->assertSame(array_slice($expectedIds, 10), $secondPage->pluck('id')->all());
@@ -219,11 +209,7 @@ class BookFoundationTest extends TestCase
 
     public function test_書籍0件の一覧データを取得できる(): void
     {
-        $view = app(BookController::class)->index(Request::create('/'));
-
-        $this->assertInstanceOf(View::class, $view);
-
-        $books = $view->getData()['books'];
+        $books = $this->get(route('books.index'))->assertOk()->viewData('books');
 
         $this->assertSame(0, $books->total());
         $this->assertTrue($books->isEmpty());
