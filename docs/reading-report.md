@@ -1,5 +1,8 @@
 # マイ読書レポート：取得基盤の設計・検証記録
 
+> 1〜12節はIssue #84の資料作成時点の履歴として保持する。そこに記載された未実装・未コミット・保留状態、行番号、ハッシュは当時のもの。
+> Issue #85の現行実装・承認済み暫定仕様・最終検証記録は13〜19節を参照する。過去の検証数値を現行値で上書きしない。
+
 ## 1. 資料概要
 
 - 対象マイルストーン：14. ★ マイ読書レポート
@@ -264,3 +267,161 @@ Seederのランダム生成と、集計の境界条件を固定するテスト�
 | Git工程 | ステージング・Commit・Push・Issue #84のPR作成・Mergeは未実施 |
 
 Issue #84の承認済み範囲と、マイルストーン全体の完成・提出準備を区別する。既存認証機能そのものが未実装という意味ではない。ユーザー承認前に次のGit工程や後続実装へ進まない。
+
+## 13. Issue #85の更新概要・根拠・承認区分
+
+- 対象：[Issue #85「基本サマリー・評価分布の実装」](https://github.com/715OXY/bookshelf-app/issues/85)。更新日：2026-11-26。
+- 作業ブランチ：feature/issue-85-reading-report-summary。HEAD：2bc85a8fd03cf979a466c3b2f63e12d4cbaf290f。
+- 検証対象は上記HEADにService変更・新規テスト3ファイルを加えた未コミット状態。本資料の更新はその検証後に行う。
+- 先行Issue #84・PR #88は、Issue #85の作業指示でClosed・Mergedと共有された。12節の未実施記録はIssue #84資料作成時の履歴として保持する。
+
+正式要件の参照基準は2節の20261121版要件シート。シート3 E17:E20・E28:E30、シート5 D21:I21、シート7 C48:I48（読了冊数はH48）、シート9 D11:F12、シート11 D35、シート12 E43:J46をSTEP 03で確認した記録に基づく。今回の資料更新では原本を再確認していない。資料保存先の原本と開発リポジトリを区別する。
+
+H008・H016・H057・H058は2節で確認された範囲に限定する。ランキングのH069・H070をレポートの正式仕様へ自動適用しない。H091〜H093の最新PM回答は未確認であり、「未回答」「承認済み」と断定しない。H094・H095の内容や登録状況も番号から推測しない。
+
+2026-11-26のユーザー承認：STEP 04の方針Bにより、PM回答の最新状態は未確認のまま、承認済み暫定仕様で先行設計・実装する。STEP 05のService拡張案Aに、集計時の全SQL増分0件の必須検証と、入力・認証責務のPHPDoc明記を加えた詳細設計を採用した。Issue #84の取得基盤先行・画面公開延期方針は継続する。
+
+PMの正式承認とユーザーの暫定仕様承認は別である。PM回答取得後は出典・差分・影響を記録し、独断で仕様を書き換えず、必要な修正・再検証を行う。正式仕様適合の最終判定およびIssue Closeは整合確認まで保留する。
+
+## 14. Issue #85の集計仕様・管理ID
+
+| ID | 実装する仕様 | 根拠・区分 |
+|---|---|---|
+| S01 | 指定会員本人の全レビュー | 既存本人限定取得契約・認証会員の選定は呼出側 |
+| S02 | 同一書籍への複数レビューも総数へ個別計上 | ユーザー承認済み暫定仕様、最新PM回答未確認 |
+| S03 | book_idの重複を排除した読了冊数 | 正式要件：シート7 H48 |
+| S04 | 本人の全レビューの算術平均 | ユーザー承認済み暫定仕様、最新PM回答未確認 |
+| S05 | 平均は常にfloat | ユーザー承認済み実装方針・内部データ契約 |
+| S06 | 集計内で中間丸めを行わない | ユーザー承認済み暫定仕様、最新PM回答未確認 |
+| S07 | 0件平均は0.0 | 承認済み内部代替値。平均未定義を表し、有効な評価点ではない |
+| S08 | 各レビューを評価別件数へ個別計上 | ユーザー承認済み暫定仕様、最新PM回答未確認 |
+| S09 | 星1〜5の5区分を保持し欠損を整数0で補完 | 表示要件・提供Bladeとのデータ契約 |
+| S10 | 整数キー0〜4のSupport Collection | 提供Bladeとのデータ契約 |
+| S11 | 分布合計とレビュー総数を一致させる | 採用した計上単位間の整合条件 |
+| S12 | #85では画面未公開、#86でTOP5と合わせて接続 | ユーザー承認済み段階実装方針 |
+
+同一会員・同一書籍への複数レビュー許可は正式要件とH008に基づく。許可される投稿と、それを各統計でどう計上するかの承認区分を混同しない。
+
+## 15. Issue #85のService設計・部分集計契約
+
+[ReadingReportService](../app/Services/ReadingReportService.php)を今回直接確認した。既存getReviewsFor(User $user): Collection（19〜24行）は、本人レビューとbook.genresを取得する実装・PHPDoc・契約を維持する。
+
+| メソッド | 可視性・戻り値 | 責務・現行行番号 |
+|---|---|---|
+| getReviewsFor(User $user) | public、Eloquent Collection<int, Review> | 本人限定取得・先読み。19〜24行 |
+| getBasicStats(Collection $reviews) | public、array | 基本サマリーと分布の部分結果。26〜44行にPHPDoc・実装 |
+| buildSummary(Collection $reviews) | private、array | count、book_idのpluck・unique・count、avgとfloat cast。46〜60行 |
+| buildRatingDistribution(Collection $reviews) | private、SupportCollection<int, int> | ratingのpluck・countBy、星1〜5をmapし欠損0、values。62〜75行 |
+
+入力はgetReviewsFor()で取得した指定会員本人の全レビュー。対象会員の選定と本人限定取得は呼出側・取得基盤の責務であり、getBasicStats()はHTTP認証・会員の再選別を行わない。会員混在の入力は契約違反である。
+
+取得済みのbook_id・ratingだけを使い、レビューの再取得、DB再集計、遅延読み込みを行わない。入力Collection・Modelを変更せず、Serviceに会員別集計状態を保持しない。出版日を参照しない。評価1〜5のDB制約とReviewのinteger castを前提とし、無効値の黙示除外・補正を加えない。
+
+戻り値は以下の部分集計契約であり、TOP5のプレースホルダーや完全な$statsを返さない。
+
+```php
+array{
+    summary: array{
+        total_reviews: int,
+        books_read: int,
+        average_rating: float
+    },
+    rating_distribution: SupportCollection<int, int>
+}
+```
+
+本人が書籍Aへ評価5・1、書籍Bへ評価4を投稿した場合、total_reviews=3、books_read=2、average_rating=10 / 3、分布=[1, 0, 0, 1, 1]。他会員による書籍Bへの評価2は取得基盤で対象外となる。
+
+0件時はtotal_reviews=0、books_read=0、average_rating=0.0、分布=[0, 0, 0, 0, 0]。平均は整数相当でもfloat、分布のキーは整数0〜4、値は整数5要素とする。
+
+平均の小数第1位整形・0件時の「-」表示・分布バー計算は6節の提供Bladeの責務。今回のIssueでは画面へ接続せず、画面描画の実行検証も行っていない。
+
+## 16. Issue #85のテスト設計・SQL計測・DB安全性
+
+以下3ファイルを今回直接確認した。新規テストは合計11件。
+
+| クラス・ファイル | 件数 | 検証責務 |
+|---|---:|---|
+| [ReadingReportBasicStatsTest](../tests/Unit/Services/ReadingReportBasicStatsTest.php) | 7 | 総数と冊数、丸め防止、float、星別順序・整数件数、欠損0と合計一致、0件、入力Collection・Modelの非破壊性 |
+| [ReadingReportBasicStatsIntegrationTest](../tests/Feature/ReadingReportBasicStatsIntegrationTest.php) | 3 | 本人限定と登録者・ジャンル所属の区別、同一Serviceでの会員切替、追加・更新・削除後の再取得と再集計 |
+| [ReadingReportBasicStatsQueryEfficiencyTest](../tests/Feature/ReadingReportBasicStatsQueryEfficiencyTest.php) | 1 | 1冊2レビュー→10冊20レビュー、取得のみと取得＋集計の比較、集計時のSELECT・全SQL増分0、件数増加で取得SELECT数増加なし |
+
+UnitはPHPUnit\Framework\TestCaseを直接継承し、new ReviewとEloquent Collectionを使う。DB・Factory・Laravelアプリ起動に依存しない。非連続キー、モデル同一性、属性・original・関連状態を比較し、privateメソッドを直接呼び出さない。平均のfloat型検証と誤差1.0E-12の数値比較を分ける。S02・S04・S06・S08の期待値は暫定仕様への適合を検証する。
+
+Integrationは固定評価・明示した投稿者と書籍を使う。BookFactoryの自動ジャンル付与を未所属Fixtureで解除する。変更後の再計算は[5]→[5,1]→[3,1]→[1]→[]の各段階で再取得する。HTTPによるレビュー操作・認証・表示までの検証は後続Issueへ引き継ぐ。
+
+SQL効率テストのmeasureQueries()（100〜146行）は、特定したDB接続のDispatcherをcloneし、QueryExecutedで全SQLとSELECTを区別して数える。User・Review取得クエリ・Book・Genreの接続と一致することを確認する。Fixture生成・安全確認SQLは計測外で、取得直後（127〜128行）と集計直後（129〜131行）を区切る。
+
+少数・増加後とも、取得SELECT数>0、集計追加SELECT=0、集計追加全SQL=0、取得＋集計のSELECT・全SQL数が取得のみと一致することを必須検証する。結果ID・投稿者・集計内容も照合する。取得SQL数の絶対値は固定せず、具体的な実測回数を推測しない。
+
+計測対象はテストで特定した接続である。任意の別DB接続を含む全アプリケーションのSQLを監視したという保証ではない。finally（143〜145行）で元のDispatcherを復元し、クエリログの状態を変更しない。
+
+新規Feature 2クラスはRefreshDatabaseを使用し、beforeRefreshingDatabase()でtesting環境、MySQL、設定上のDB名testing、SELECT DATABASE()による実DB名testingを確認する。既存フックと同様、失敗時にDB再構築へ進まない。phpunit.xml・CreatesApplication・DatabaseConnectionTest・既存テストは無変更。今回の資料更新でDB接続や安全確認SQLを実行していない。
+
+## 17. Issue #85の品質検証記録
+
+出典：2026-11-26のIssue #85 STEP 08作業指示でユーザーから共有された検証記録。今回Codexが再実行した結果ではなく、詳細ログを新たに独立取得したものでもない。検証版は13節の未コミットPHP成果物。本資料更新後もPHPを変更しない。
+
+### 17-1. STEP 07-A〜Eの初回検証
+
+| 対象 | 共有された実績 |
+|---|---|
+| DB安全確認 | 1 passed、6 assertions |
+| 新規Unit | 7 passed、34 assertions |
+| 新規Feature | 4 passed、340 assertions |
+| Issue #84回帰 | 6 passed、231 assertions |
+| 関連回帰 | 18 passed、255 assertions |
+| PHPUnit全体 | 890 passed、1 deprecated、10328 assertions、43.30秒、終了コード0 |
+
+### 17-2. Pint初回指摘と最小修正
+
+STEP 07-Fは対象4ファイルにスタイル指摘2件、終了コード1。全体Pintは未実行だった。STEP 07-F-1で新規テストのphp_unit_method_casingによる命名指摘と整理した。
+
+| 対象 | 修正前 | 修正後 |
+|---|---|---|
+| Unit 99行 | test_集計前後で入力Collectionとモデルを変更しない | test_集計前後で入力コレクションとモデルを変更しない |
+| SQL効率 36行 | test_取得済みレビューの集計でSQLを追加せず取得集計全体でも再取得しない | test_取得済みレビューの集計で追加クエリを発行せず取得集計全体でも再取得しない |
+
+STEP 07-F-2で各宣言1行のみ変更。共有された最終確認記録では旧名称復元SHA-256でその他の内容の一致を確認済み。CodexのF-2作業時にも修正前データとのメモリ比較で各1行以外の一致を確認した。本番実装、テスト本体、Fixture、Assertions、DB安全機構は無変更で、テスト数7・3・1、物理行数138・131・147を維持した。
+
+### 17-3. 修正後の最終検証
+
+| 段階 | 共有された実績 | 終了コード |
+|---|---|---|
+| 07-F-3 | 修正対象2ファイルPint PASS。Unit 7 passed・34 assertions、DB安全1 passed・6 assertions、新規Feature 4 passed・340 assertions。新規11テスト合計374 assertions | 各0 |
+| 07-F-4 | 総数891、890 passed・1 deprecated、Failed・Errors 0、10328 assertions、41.57秒 | 0 |
+| 07-F-5 | 対象4ファイルPint PASS、全体226ファイルPASS、スタイル指摘0 | 各0 |
+| 07-G | route:list --path=reports・--name=reportsとも該当なし。ルート・Controller・提供Bladeの差分なし | 各0 |
+| 07-H | 最終コードレビューR01〜R15の15項目PASS。変更4ファイル、追加468行・削除0行、総物理行数492。既存コード・DB安全機構の差分なし。Diff Check・新規3ファイル個別空白診断に指摘なし、ステージ済み変更なし、成果物・既存資料・AGENTS.md保全 | 個別の未提示値は補完しない |
+
+上記共有記録に基づきSTEP 07の技術的品質検証は完了と記録する。資料更新後の最終レビュー、正式仕様適合、Issue完了承認とは区別する。個別・関連・全体回帰は重複するため実績を合算しない。実行時間は単発参考値で性能差を断定しない。カバレッジや取得SELECT数の新しい数値は記録にない。
+
+### 17-4. 既知Deprecationと保証の限界
+
+検出1件はTests\Unit\Models\BookTestの「登録者との多対一関連が定義されている」、表示された発生元はLaravel\Sanctum\HasApiTokens…。AGENTS.md管理のSanctum 3.3.3・暗黙的nullable型宣言の既知事象と整合する。省略表示のためメッセージ全文の照合は未実施。新規Deprecation発生を示す証拠はない。依存関係・vendorは変更していない。
+
+## 18. Issue #85成果物の保全・資料更新の検証範囲
+
+| ファイル | 資料更新前後で保全するSHA-256 |
+|---|---|
+| app/Services/ReadingReportService.php | 9006f0fdc073ff5a53e58f40da86cf645345f17cc436e26ec1d4e4ae7da45951 |
+| tests/Unit/Services/ReadingReportBasicStatsTest.php | 9637430d481b5a16a232e82e1e0679332dad7b8c2946bf8ed932e24149c9236e |
+| tests/Feature/ReadingReportBasicStatsIntegrationTest.php | 8441e83a962b072e9001726be07be34edb3bcdc12f2e775016b0e0087d8aae89 |
+| tests/Feature/ReadingReportBasicStatsQueryEfficiencyTest.php | 7f29bd22cba13d18368708af65ad5b02cf32e785d1f94a792a7eca8ccebace33 |
+| tests/Feature/ReadingReportServiceTest.php | 829c5d6944d7b9e127b424dfc63958636e6ca6a2cfc7d857a7ae4b6e409f9279 |
+| tests/Feature/ReadingReportQueryEfficiencyTest.php | 87c454254e7248348e42e9f0a8eb106e6e04fed73a9aa20a87bb55fb52af7394 |
+| AGENTS.md | 5d34dafe35a2dde4ae67f0e8e7c581670939731269f8f785e756afff80bb2ffe |
+
+更新前の本資料は266行、SHA-256=b578043fe3245444cdeb3e2cf4fdb69481486e1b730bd1b17e50d9bda91c55b0。今回の変更は本資料だけとし、1〜12節の本文を保持して案内と13〜19節を追加する。更新後の本資料のハッシュ・行数・差分、上記7ファイルの照合結果はSTEP 08完了報告に記録する。
+
+今回はGit状態・差分・空白診断・ステージ済み差分・ハッシュを読み取り確認する。PHPUnit・Pint・route:list・DB操作を再実行せず、Git参照・インデックス・GitHubを変更しない。資料を含む最終レビューは別工程とする。
+
+## 19. 残存課題・Issue #86／#87への引継ぎ
+
+- H091〜H093および丸め・0件・TOP5の最新PM回答を確認し、暫定仕様との差分・影響を整理する。正式仕様適合とIssue Closeは整合確認まで保留。
+- #86ではgetReviewsFor()で取得した同じCollectionとgetBasicStats()を再利用し、高評価書籍・ジャンル傾向TOP5を実装して4統計を統合する。認証済み本人の選定、Controller・Route・提供Blade接続、本人限定性・認証・表示・リンク・導線・描画込みSQL効率を確認する。提供Blade変更禁止を維持する。
+- #87ではシート9 D11:F12に基づく発展機能用Seederと、レビュー変更後を含むマイ読書レポート全体の統合・回帰検証・資料整備を行う。
+- #79／PR #83の保留事項との統合確認を残す。出版日NULL許可・API省略時処理等は10-3節の履歴を踏まえ、統合後に再確認する。今回その変更を取り込まず、NULL出版日ケースの検証済みとは扱わない。
+- #79のローカルfeature/issue-79-integration-verificationおよびoriginのリモート追跡参照は、今回ともにcb5c07c842043ce18f47310b211abaadbf21bc81と読み取り確認した。fetchやGitHub最新状態の直接確認はしていない。
+- Issue #85のコミット・プッシュ・PR作成・マージ・Issue Closeは未実施。PM整合確認前の管理にはDraft PRを候補とするが、今回作成しない。
+- 後続Issueの設計・実装は今回開始しない。技術的品質検証完了と正式仕様・マイルストーン完成を区別し、資料レビューとユーザーの次工程指示を待つ。
