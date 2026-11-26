@@ -25,7 +25,6 @@ class BookValidationTest extends TestCase
                 'title' => 'タイトルは必須です。',
                 'author' => '著者は必須です。',
                 'isbn' => 'ISBNは必須です。',
-                'published_date' => '出版日は必須です。',
                 'genres' => 'ジャンルを1つ以上選択してください。',
             ]);
 

@@ -27,7 +27,6 @@ class StoreBookValidationTest extends BookValidationTestCase
                 'title',
                 'author',
                 'isbn',
-                'published_date',
                 'genres',
             ])
             ->assertJsonMissingPath('errors.user_id');

@@ -1,5 +1,8 @@
 # 基本DB設計・ER図
 
+> Issue #79（2026-11-26）の出版日変更は末尾節と[MS13統合記録](ms13-integration-verification.md)を参照。
+> 基本版の実DB照合結果は過去の履歴。#79の開発DB適用結果と復旧の確認範囲はMS13統合記録を参照。
+
 ## 1. 対象と根拠
 
 - 記録日：2026-11-20
@@ -126,7 +129,7 @@ Laravelの標準管理テーブルは上記ER図から省略する。
 
 - reviews.rating：1〜5のCHECK制約
 - reviews.comment：NULL許容
-- books.published_date：NOT NULL
+- books.published_date：NULL許容（Issue #79の新規Migration適用後。基本版はNOT NULL）
 - books.description・image_url：NULL許容
 
 usersの2FA関連3カラムはNULLを許容する。
@@ -156,3 +159,14 @@ usersの2FA関連3カラムはNULLを許容する。
 - [README](../README.md)
 - [MS10モデル・DB関連検証記録](ms10-model-verification.md)
 - [MS10最終統合検証記録](ms10-final-verification.md)
+
+
+## Issue #79：books.published_dateのNULL許容
+
+- 公式20261121版シート11 G14とユーザー承認に基づき、新規2026_11_26_000000_make_books_published_date_nullable.phpを追加する。既存create_books_tableの定義は履歴として保持する。
+- DATE型、既存日付、他カラム、一意制約、外部キー、関連データは変更しない。MySQL標準DDLを使用し、追加依存は不要とする構成。
+- downはNULL行があれば理由の分かる例外で停止する。NULLなしの場合だけNOT NULLへ戻し、削除や架空日付の補完はしない。実復旧は並行書き込みを停止し、データと対象Migrationを確認する別工程。
+- 保存検証の任意化はDBのNULL許可と区別する。Web/API登録省略はNULL、更新省略は保持、明示空値はNULLという保存仕様は今回のユーザー承認済み設計。H077のPM回答済みとは扱わない。
+- Bookのdateキャスト、既存のNULL対応表示を維持する。API Resourceの日付変換だけをNULL対応にする。提供Bladeの必須マークは表示制約として残す。
+- Migrationテストはtesting内の接頭辞付き専用テーブルに隔離する。通常業務テーブルとMigration履歴には触れず、DDL後の片付けと接続復元をfinallyで行う。ユーザー実行の隔離テスト結果はMS13統合記録を参照。
+- ユーザー共有では開発DBへの適用後に出版日のNULL許可とMigrationのRanを確認した。開発DBの全データ比較・実rollback・バックアップ復元は未実施。
