@@ -42,6 +42,17 @@ class IsbnLookupTest extends TestCase
         ], $overrides)];
     }
 
+    private function candidateWithInvalidIdentifiers(bool $missing, mixed $identifiers): array
+    {
+        $candidate = $this->candidate(['industryIdentifiers' => $identifiers]);
+
+        if ($missing) {
+            unset($candidate['volumeInfo']['industryIdentifiers']);
+        }
+
+        return $candidate;
+    }
+
     private function fakeBooks(array $items): void
     {
         Http::fake(['www.googleapis.com/books/v1/volumes*' => Http::response(['totalItems' => count($items), 'items' => $items])]);
@@ -268,12 +279,56 @@ class IsbnLookupTest extends TestCase
         ];
     }
 
-    public function test_識別番号一致を確認できない候補は採用しない(): void
+    #[DataProvider('不正な識別情報')]
+    public function test_識別番号一致を確認できない候補は採用しない(bool $missing, mixed $identifiers): void
     {
         $this->actingAs(User::factory()->create());
-        $this->fakeBooks([$this->candidate([], '9781234567891'), $this->candidate(['industryIdentifiers' => [['type' => 'ISBN_10', 'identifier' => self::ISBN]]])]);
-        $this->get(self::URL)->assertStatus(404)->assertJsonMissingPath('title');
+        $before = $this->snapshot();
+        $this->fakeBooks([
+            $this->candidateWithInvalidIdentifiers($missing, $identifiers),
+            $this->candidate([], '9781234567891'),
+            $this->candidate(['industryIdentifiers' => [['type' => 'ISBN_10', 'identifier' => self::ISBN]]]),
+        ]);
+        $response = $this->get(self::URL)->assertStatus(404)->assertJsonStructure(['error']);
+        $this->assertIsString($response->json('error'));
+        $this->assertNotSame('', $response->json('error'));
+        $this->assertSame(['error'], array_keys($response->json()));
         Http::assertSentCount(1);
+        $this->assertSame($before, $this->snapshot());
+    }
+
+    public static function 不正な識別情報(): array
+    {
+        return [
+            '欠損' => [true, null],
+            'NULL' => [false, null],
+            '文字列' => [false, self::ISBN],
+            'オブジェクト' => [false, (object) ['type' => 'ISBN_13', 'identifier' => self::ISBN]],
+            '空配列' => [false, []],
+        ];
+    }
+
+    public function test_不正識別情報を飛ばして後続の完全一致候補を採用する(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $before = $this->snapshot();
+        $items = [];
+
+        foreach (self::不正な識別情報() as [$missing, $identifiers]) {
+            $items[] = $this->candidateWithInvalidIdentifiers($missing, $identifiers);
+        }
+
+        $items[] = $this->candidate(['title' => '後続の完全一致候補']);
+        $this->fakeBooks($items);
+        $this->get(self::URL)->assertOk()->assertExactJson([
+            'title' => '後続の完全一致候補',
+            'author' => '著者A / 著者B',
+            'description' => '説明&補足',
+            'image_url' => 'https://example.com/cover.jpg',
+            'published_date' => '2024-02-29',
+        ]);
+        Http::assertSentCount(1);
+        $this->assertSame($before, $this->snapshot());
     }
 
     #[DataProvider('通信障害')]
@@ -322,6 +377,15 @@ class IsbnLookupTest extends TestCase
         $this->assertSame($data['image_url'], $book->image_url);
         $this->assertSame($data['published_date'], $book->published_date->format('Y-m-d'));
         $this->assertSame([$genre->id], $book->genres->modelKeys());
+        // ISBN取得値による登録が、既存のWeb一覧と公開API読取へ反映されることだけを補う。
+        $filters = ['keyword' => $data['title'], 'genre' => $genre->id, 'sort' => 'rating'];
+        $listed = $this->get(route('books.index', $filters))->assertOk()->viewData('books');
+        $this->assertSame([$book->id], $listed->pluck('id')->all());
+        $this->getJson(route('api.v1.books.index', ['keyword' => self::ISBN, 'genre_id' => $genre->id]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $book->id)
+            ->assertJsonPath('data.0.published_date', $data['published_date']);
+        $this->getJson(route('api.v1.books.show', $book))->assertOk()
+            ->assertJsonPath('data.title', $data['title'])->assertJsonPath('data.author', $data['author']);
         $this->get(route('books.edit', $book))->assertOk()->assertSee('id="isbn-search"', false);
         $payload['title'] = '手入力で補完';
         $this->put(route('books.update', $book), $payload)->assertRedirect(route('books.show', $book))->assertSessionHasNoErrors();
@@ -329,7 +393,7 @@ class IsbnLookupTest extends TestCase
         $otherBook = Book::factory()->create(['user_id' => $owner->id]);
         $before = $this->snapshot();
         $invalidPayload = $payload;
-        $invalidPayload['published_date'] = '';
+        $invalidPayload['published_date'] = '2026-02-30';
         $this->put(route('books.update', $book), $invalidPayload)->assertSessionHasErrors('published_date');
         $this->assertSame($before, $this->snapshot());
         $this->put(route('books.update', $otherBook), $payload)->assertSessionHasErrors('isbn');

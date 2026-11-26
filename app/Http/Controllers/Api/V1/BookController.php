@@ -74,6 +74,7 @@ class BookController extends Controller
 
         $attributes = $request->safe()->except(['genres', 'user_id']);
         $attributes['user_id'] = $request->user()->getAuthIdentifier();
+        $attributes['published_date'] = $attributes['published_date'] ?? null;
         $attributes['description'] = $attributes['description'] ?? null;
         $attributes['image_url'] = $attributes['image_url'] ?? null;
 
@@ -88,7 +89,7 @@ class BookController extends Controller
     }
 
     /**
-     * 書籍を更新する。
+     * 書籍を更新する。出版日の省略は保持し、他の任意項目の省略時処理は維持する。
      */
     public function update(
         UpdateBookRequest $request,

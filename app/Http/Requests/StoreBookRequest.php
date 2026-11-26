@@ -37,7 +37,7 @@ class StoreBookRequest extends FormRequest
             ],
             'published_date' => [
                 'bail',
-                'required',
+                'nullable',
                 'string',
                 'date_format:Y-m-d',
             ],
@@ -86,7 +86,6 @@ class StoreBookRequest extends FormRequest
             'isbn.regex' => 'ISBNは半角数字13桁で入力してください。',
             'isbn.unique' => 'そのISBNは既に使用されています。',
 
-            'published_date.required' => '出版日は必須です。',
             'published_date.string' => '出版日は文字列で入力してください。',
             'published_date.date_format' => '出版日は有効な日付形式で入力してください。',
 

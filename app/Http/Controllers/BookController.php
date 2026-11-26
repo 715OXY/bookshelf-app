@@ -101,6 +101,7 @@ class BookController extends Controller
 
         $attributes = $request->safe()->except('genres');
         $attributes['user_id'] = $request->user()->id;
+        $attributes['published_date'] = $attributes['published_date'] ?? null;
         $genreIds = $request->validated('genres');
 
         try {
@@ -149,7 +150,7 @@ class BookController extends Controller
     }
 
     /**
-     * 書籍情報と選択ジャンルを更新する。
+     * 書籍情報と選択ジャンルを更新する。出版日は省略なら保持し、明示NULLなら消去する。
      */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {

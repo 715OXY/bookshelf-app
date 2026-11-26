@@ -13,7 +13,15 @@ class GoogleBooksService
 
     private const DATE_ERROR = '出版日を確認できないため自動入力しませんでした。現在の入力内容は変更していません。書籍を確認し、手入力してください。';
 
-    /** @return array<string, string> */
+    /**
+     * 固定のGoogle Books窓口から取得し、応答順で最初の自動入力可能な完全一致候補を返す。
+     * 候補ごとの不備は後続候補を確認し、使用可能な候補がなければエラーにする。
+     *
+     * @param  string  $isbn  FormRequestで検証済みの13桁ISBN
+     * @return array{title: string, author: string, description: string, image_url: string, published_date: string}
+     *
+     * @throws IsbnLookupException 設定不足・外部障害・候補なし・自動入力できない情報の場合
+     */
     public function lookup(string $isbn): array
     {
         $key = config('services.google_books.key');
@@ -80,7 +88,11 @@ class GoogleBooksService
         throw $candidateError ?? new IsbnLookupException('取得した候補から指定ISBNと一致する書籍情報を確認できませんでした。', 404);
     }
 
-    /** @param array<string, mixed> $info */
+    /**
+     * 同じ候補のISBN_13が要求値と文字列で完全一致するか確認する。
+     *
+     * @param  array<string, mixed>  $info  候補の書誌情報
+     */
     private function matchesIsbn(array $info, string $isbn): bool
     {
         $identifiers = $info['industryIdentifiers'] ?? null;
@@ -101,8 +113,13 @@ class GoogleBooksService
     }
 
     /**
-     * @param  array<string, mixed>  $info
-     * @return array<string, string>
+     * 単一候補を自動入力用に変換する。保存時の任意入力と異なり完全な出版日を要求する。
+     * 任意項目の欠損・不正型は空文字とし、連結・変換後の保存上限を確認する。
+     *
+     * @param  array<string, mixed>  $info  完全一致候補の書誌情報
+     * @return array<string, string> 出版日を含む自動入力用の5項目
+     *
+     * @throws IsbnLookupException 出版日不備または保存上限超過の場合
      */
     private function normalize(array $info): array
     {
@@ -136,6 +153,11 @@ class GoogleBooksService
         return $result;
     }
 
+    /**
+     * thumbnail、smallThumbnailの順で有効なHTTPS画像URLを選ぶ。取得不可なら空文字を返す。
+     *
+     * @param  mixed  $links  外部応答の画像リンク情報
+     */
     private function imageUrl(mixed $links): string
     {
         if (! ($links instanceof \stdClass)) {
